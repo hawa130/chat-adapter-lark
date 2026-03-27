@@ -15,6 +15,7 @@
 ### Task 1: Update types.ts — add CardKit types
 
 **Files:**
+
 - Modify: `src/types.ts`
 
 - [ ] **Step 1: Add CardKitCard interface**
@@ -46,6 +47,7 @@ git commit -m "feat: add CardKitCard type for streaming support"
 ### Task 2: Rewrite card-mapper.ts to v2 structure
 
 **Files:**
+
 - Modify: `src/card-mapper.ts`
 - Modify: `tests/card-mapper.test.ts`
 
@@ -187,6 +189,7 @@ export default cardMapper
 ```
 
 Key changes from v1:
+
 - `schema: "2.0"` and `config: { update_multi: true }` at top level.
 - `element_id` auto-generated on every element.
 - `actions` case now returns flattened button array (no `action` wrapper).
@@ -376,6 +379,7 @@ git commit -m "feat: rewrite card-mapper to output v2 JSON structure"
 ### Task 3: Add CardKit methods to api-client.ts
 
 **Files:**
+
 - Modify: `src/api-client.ts`
 - Modify: `tests/api-client.test.ts`
 
@@ -416,63 +420,60 @@ Add these three methods to the `LarkApiClient` class, before the `private async 
 Add the following test cases inside the existing `describe('LarkApiClient', ...)` block, before the closing `})`:
 
 ```ts
-  it('createCard — creates card entity', async () => {
-    let captured: unknown = undefined
-    server.use(
-      tokenHandler,
-      http.post(`${BASE}/open-apis/cardkit/v1/cards`, async ({ request }) => {
+it('createCard — creates card entity', async () => {
+  let captured: unknown = undefined
+  server.use(
+    tokenHandler,
+    http.post(`${BASE}/open-apis/cardkit/v1/cards`, async ({ request }) => {
+      captured = await request.json()
+      return HttpResponse.json({ code: 0, data: { card_id: 'card_001' } })
+    }),
+  )
+
+  const client = makeClient()
+  const result = await client.createCard('{"schema":"2.0"}')
+
+  expect(captured).toMatchObject({ data: '{"schema":"2.0"}', type: 'card_json' })
+  expect(result).toMatchObject({ data: { card_id: 'card_001' } })
+})
+
+it('streamUpdateText — streams text to element', async () => {
+  let captured: unknown = undefined
+  server.use(
+    tokenHandler,
+    http.put(
+      `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
+      async ({ request }) => {
         captured = await request.json()
-        return HttpResponse.json({ code: 0, data: { card_id: 'card_001' } })
-      }),
-    )
+        return HttpResponse.json({ code: 0, data: {} })
+      },
+    ),
+  )
 
-    const client = makeClient()
-    const result = await client.createCard('{"schema":"2.0"}')
+  const client = makeClient()
+  await client.streamUpdateText('card_001', 'stream_md', 'Hello world', 1)
 
-    expect(captured).toMatchObject({ data: '{"schema":"2.0"}', type: 'card_json' })
-    expect(result).toMatchObject({ data: { card_id: 'card_001' } })
+  expect(captured).toMatchObject({ content: 'Hello world', sequence: 1 })
+})
+
+it('updateCardSettings — updates card config', async () => {
+  let captured: unknown = undefined
+  server.use(
+    tokenHandler,
+    http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, async ({ request }) => {
+      captured = await request.json()
+      return HttpResponse.json({ code: 0, data: {} })
+    }),
+  )
+
+  const client = makeClient()
+  await client.updateCardSettings('card_001', '{"config":{"streaming_mode":false}}', 2)
+
+  expect(captured).toMatchObject({
+    sequence: 2,
+    settings: '{"config":{"streaming_mode":false}}',
   })
-
-  it('streamUpdateText — streams text to element', async () => {
-    let captured: unknown = undefined
-    server.use(
-      tokenHandler,
-      http.put(
-        `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
-        async ({ request }) => {
-          captured = await request.json()
-          return HttpResponse.json({ code: 0, data: {} })
-        },
-      ),
-    )
-
-    const client = makeClient()
-    await client.streamUpdateText('card_001', 'stream_md', 'Hello world', 1)
-
-    expect(captured).toMatchObject({ content: 'Hello world', sequence: 1 })
-  })
-
-  it('updateCardSettings — updates card config', async () => {
-    let captured: unknown = undefined
-    server.use(
-      tokenHandler,
-      http.patch(
-        `${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`,
-        async ({ request }) => {
-          captured = await request.json()
-          return HttpResponse.json({ code: 0, data: {} })
-        },
-      ),
-    )
-
-    const client = makeClient()
-    await client.updateCardSettings('card_001', '{"config":{"streaming_mode":false}}', 2)
-
-    expect(captured).toMatchObject({
-      sequence: 2,
-      settings: '{"config":{"streaming_mode":false}}',
-    })
-  })
+})
 ```
 
 - [ ] **Step 3: Run tests**
@@ -497,6 +498,7 @@ git commit -m "feat: add CardKit API methods (createCard, streamUpdateText, upda
 ### Task 4: Rewrite adapter.ts — card sending and streaming
 
 **Files:**
+
 - Modify: `src/adapter.ts`
 
 - [ ] **Step 1: Update imports and remove old streaming constants**
@@ -520,9 +522,7 @@ const INITIAL_SEQUENCE = 1
 Replace `renderCardMessage`:
 
 ```ts
-const renderCardMessage = (
-  message: AdapterPostableMessage,
-): Record<string, unknown> | null => {
+const renderCardMessage = (message: AdapterPostableMessage): Record<string, unknown> | null => {
   const card = extractCard(message)
   if (!card) {
     return null
@@ -667,6 +667,7 @@ git commit -m "feat: rewrite card sending via card_id and streaming via CardKit 
 ### Task 5: Update adapter tests
 
 **Files:**
+
 - Modify: `tests/adapter.test.ts`
 - Modify: `tests/integration.test.ts`
 
@@ -706,28 +707,28 @@ const initAdapter = async (adapter: LarkAdapter) => {
 Find the test `'postMessage with card sends msg_type interactive'` and replace it:
 
 ```ts
-    it('postMessage with card sends via card_id', async () => {
-      let captured = undefined as unknown
-      server.use(
-        tokenHandler,
-        createCardHandler,
-        http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
-          captured = await request.json()
-          return HttpResponse.json({ code: 0, data: { message_id: 'om_card1' } })
-        }),
-      )
-      const card = {
-        children: [],
-        title: 'Test Card',
-        type: 'card' as const,
-      }
-      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
-      const result = await adapter.postMessage(threadId, card)
-      expect(captured).toMatchObject({ msg_type: 'interactive' })
-      const content = JSON.parse((captured as { content: string }).content)
-      expect(content).toMatchObject({ type: 'card', data: { card_id: 'card_test_001' } })
-      expect(result.id).toBe('om_card1')
-    })
+it('postMessage with card sends via card_id', async () => {
+  let captured = undefined as unknown
+  server.use(
+    tokenHandler,
+    createCardHandler,
+    http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
+      captured = await request.json()
+      return HttpResponse.json({ code: 0, data: { message_id: 'om_card1' } })
+    }),
+  )
+  const card = {
+    children: [],
+    title: 'Test Card',
+    type: 'card' as const,
+  }
+  const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+  const result = await adapter.postMessage(threadId, card)
+  expect(captured).toMatchObject({ msg_type: 'interactive' })
+  const content = JSON.parse((captured as { content: string }).content)
+  expect(content).toMatchObject({ type: 'card', data: { card_id: 'card_test_001' } })
+  expect(result.id).toBe('om_card1')
+})
 ```
 
 - [ ] **Step 3: Rewrite streaming tests**
@@ -735,89 +736,88 @@ Find the test `'postMessage with card sends msg_type interactive'` and replace i
 Replace the entire `describe('stream', ...)` block:
 
 ```ts
-  describe('stream', () => {
-    let adapter = undefined as unknown as LarkAdapter
+describe('stream', () => {
+  let adapter = undefined as unknown as LarkAdapter
 
-    beforeEach(async () => {
-      adapter = makeAdapter()
-      await initAdapter(adapter)
-    })
+  beforeEach(async () => {
+    adapter = makeAdapter()
+    await initAdapter(adapter)
+  })
 
-    it('creates streaming card, sends updates, then closes streaming', async () => {
-      const streamUpdates: Array<{ content: string; sequence: number }> = []
-      let settingsCaptured = undefined as unknown
+  it('creates streaming card, sends updates, then closes streaming', async () => {
+    const streamUpdates: Array<{ content: string; sequence: number }> = []
+    let settingsCaptured = undefined as unknown
 
-      server.use(
-        tokenHandler,
-        createCardHandler,
-        http.post(`${BASE}/open-apis/im/v1/messages`, () =>
-          HttpResponse.json({ code: 0, data: { message_id: 'om_stream1' } }),
-        ),
-        http.put(
-          `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
-          async ({ request }) => {
-            const body = (await request.json()) as { content: string; sequence: number }
-            streamUpdates.push(body)
-            return HttpResponse.json({ code: 0, data: {} })
-          },
-        ),
-        http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, async ({ request }) => {
-          settingsCaptured = await request.json()
+    server.use(
+      tokenHandler,
+      createCardHandler,
+      http.post(`${BASE}/open-apis/im/v1/messages`, () =>
+        HttpResponse.json({ code: 0, data: { message_id: 'om_stream1' } }),
+      ),
+      http.put(
+        `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
+        async ({ request }) => {
+          const body = (await request.json()) as { content: string; sequence: number }
+          streamUpdates.push(body)
           return HttpResponse.json({ code: 0, data: {} })
-        }),
-      )
+        },
+      ),
+      http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, async ({ request }) => {
+        settingsCaptured = await request.json()
+        return HttpResponse.json({ code: 0, data: {} })
+      }),
+    )
 
-      const chunks = ['Hello', ' World', '!']
-      const gen = async function* streamChunks() {
-        for (const ch of chunks) {
-          yield ch
-        }
+    const chunks = ['Hello', ' World', '!']
+    const gen = async function* streamChunks() {
+      for (const ch of chunks) {
+        yield ch
       }
+    }
 
-      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
-      const result = await adapter.stream(threadId, gen())
+    const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+    const result = await adapter.stream(threadId, gen())
 
-      expect(result.id).toBe('om_stream1')
-      // Each chunk produces a stream update with accumulated text
-      expect(streamUpdates).toHaveLength(chunks.length)
-      expect(streamUpdates[streamUpdates.length - 1].content).toBe('Hello World!')
-      // Sequences are strictly incrementing
-      expect(streamUpdates.map((u) => u.sequence)).toEqual([1, 2, 3])
-      // Streaming mode closed after
-      expect(settingsCaptured).toMatchObject({
-        settings: expect.stringContaining('streaming_mode'),
-      })
-    })
-
-    it('closes streaming mode even on stream error', async () => {
-      let settingsClosed = false
-
-      server.use(
-        tokenHandler,
-        createCardHandler,
-        http.post(`${BASE}/open-apis/im/v1/messages`, () =>
-          HttpResponse.json({ code: 0, data: { message_id: 'om_stream2' } }),
-        ),
-        http.put(
-          `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
-          () => HttpResponse.json({ code: 0, data: {} }),
-        ),
-        http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, () => {
-          settingsClosed = true
-          return HttpResponse.json({ code: 0, data: {} })
-        }),
-      )
-
-      const gen = async function* streamChunks() {
-        yield 'partial'
-        throw new Error('stream broke')
-      }
-
-      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
-      await expect(adapter.stream(threadId, gen())).rejects.toThrow('stream broke')
-      expect(settingsClosed).toBe(true)
+    expect(result.id).toBe('om_stream1')
+    // Each chunk produces a stream update with accumulated text
+    expect(streamUpdates).toHaveLength(chunks.length)
+    expect(streamUpdates[streamUpdates.length - 1].content).toBe('Hello World!')
+    // Sequences are strictly incrementing
+    expect(streamUpdates.map((u) => u.sequence)).toEqual([1, 2, 3])
+    // Streaming mode closed after
+    expect(settingsCaptured).toMatchObject({
+      settings: expect.stringContaining('streaming_mode'),
     })
   })
+
+  it('closes streaming mode even on stream error', async () => {
+    let settingsClosed = false
+
+    server.use(
+      tokenHandler,
+      createCardHandler,
+      http.post(`${BASE}/open-apis/im/v1/messages`, () =>
+        HttpResponse.json({ code: 0, data: { message_id: 'om_stream2' } }),
+      ),
+      http.put(`${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`, () =>
+        HttpResponse.json({ code: 0, data: {} }),
+      ),
+      http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, () => {
+        settingsClosed = true
+        return HttpResponse.json({ code: 0, data: {} })
+      }),
+    )
+
+    const gen = async function* streamChunks() {
+      yield 'partial'
+      throw new Error('stream broke')
+    }
+
+    const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+    await expect(adapter.stream(threadId, gen())).rejects.toThrow('stream broke')
+    expect(settingsClosed).toBe(true)
+  })
+})
 ```
 
 - [ ] **Step 4: Update integration.test.ts streaming test**
@@ -835,35 +835,35 @@ Update `initAdapter` to include `createCardHandler`.
 Replace the streaming integration test:
 
 ```ts
-  it('streaming: creates card entity, streams text, closes streaming mode', async () => {
-    const adapter = makeAdapter()
-    await initAdapter(adapter)
-    const streamUpdates: string[] = []
+it('streaming: creates card entity, streams text, closes streaming mode', async () => {
+  const adapter = makeAdapter()
+  await initAdapter(adapter)
+  const streamUpdates: string[] = []
 
-    server.use(
-      tokenHandler,
-      createCardHandler,
-      http.post(`${BASE}/open-apis/im/v1/messages`, () =>
-        HttpResponse.json({ code: 0, data: { message_id: 'om_stream1' } }),
-      ),
-      http.put(
-        `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
-        async ({ request }) => {
-          const body = (await request.json()) as { content: string }
-          streamUpdates.push(body.content)
-          return HttpResponse.json({ code: 0, data: {} })
-        },
-      ),
-      http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, () =>
-        HttpResponse.json({ code: 0, data: {} }),
-      ),
-    )
+  server.use(
+    tokenHandler,
+    createCardHandler,
+    http.post(`${BASE}/open-apis/im/v1/messages`, () =>
+      HttpResponse.json({ code: 0, data: { message_id: 'om_stream1' } }),
+    ),
+    http.put(
+      `${BASE}/open-apis/cardkit/v1/cards/:cardId/elements/:elementId/content`,
+      async ({ request }) => {
+        const body = (await request.json()) as { content: string }
+        streamUpdates.push(body.content)
+        return HttpResponse.json({ code: 0, data: {} })
+      },
+    ),
+    http.patch(`${BASE}/open-apis/cardkit/v1/cards/:cardId/settings`, () =>
+      HttpResponse.json({ code: 0, data: {} }),
+    ),
+  )
 
-    const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
-    const result = await adapter.stream(threadId, makeStreamChunks())
-    expect(result.id).toBe('om_stream1')
-    expect(streamUpdates[streamUpdates.length - LAST_INDEX_OFFSET]).toContain('Hello world!')
-  })
+  const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+  const result = await adapter.stream(threadId, makeStreamChunks())
+  expect(result.id).toBe('om_stream1')
+  expect(streamUpdates[streamUpdates.length - LAST_INDEX_OFFSET]).toContain('Hello world!')
+})
 ```
 
 Remove `setupStreamHandlers`, `assertStreamResult`, and `placeholderRef` helpers that are no longer needed.
@@ -890,6 +890,7 @@ git commit -m "test: update all tests for card v2 and CardKit streaming"
 ### Task 6: Final cleanup and verification
 
 **Files:**
+
 - Verify: all `src/` and `tests/` files
 
 - [ ] **Step 1: Run full test suite**

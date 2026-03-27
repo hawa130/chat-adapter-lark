@@ -13,16 +13,16 @@ Upgrade card output to v2 JSON structure and replace streaming with CardKit nati
 
 ### Files changed
 
-| File | Change |
-|------|--------|
-| `src/card-mapper.ts` | Rewrite output to v2 structure |
-| `src/api-client.ts` | Add CardKit API methods |
-| `src/adapter.ts` | Rewrite `stream()`, update card sending path |
-| `src/types.ts` | Add CardKit types |
-| `tests/card-mapper.test.ts` | Update all assertions for v2 |
-| `tests/api-client.test.ts` | Add CardKit method tests |
-| `tests/adapter.test.ts` | Rewrite stream + card tests |
-| `tests/integration.test.ts` | Update streaming E2E |
+| File                        | Change                                       |
+| --------------------------- | -------------------------------------------- |
+| `src/card-mapper.ts`        | Rewrite output to v2 structure               |
+| `src/api-client.ts`         | Add CardKit API methods                      |
+| `src/adapter.ts`            | Rewrite `stream()`, update card sending path |
+| `src/types.ts`              | Add CardKit types                            |
+| `tests/card-mapper.test.ts` | Update all assertions for v2                 |
+| `tests/api-client.test.ts`  | Add CardKit method tests                     |
+| `tests/adapter.test.ts`     | Rewrite stream + card tests                  |
+| `tests/integration.test.ts` | Update streaming E2E                         |
 
 ### Files unchanged
 
@@ -49,8 +49,18 @@ Output format changes:
     "elements": [
       { "tag": "markdown", "content": "...", "element_id": "el_0" },
       { "tag": "hr", "element_id": "el_1" },
-      { "tag": "img", "img_key": "...", "alt": { "tag": "plain_text", "content": "" }, "element_id": "el_2" },
-      { "tag": "button", "text": { "tag": "plain_text", "content": "Click" }, "type": "primary", "element_id": "el_3" }
+      {
+        "tag": "img",
+        "img_key": "...",
+        "alt": { "tag": "plain_text", "content": "" },
+        "element_id": "el_2"
+      },
+      {
+        "tag": "button",
+        "text": { "tag": "plain_text", "content": "Click" },
+        "type": "primary",
+        "element_id": "el_3"
+      }
     ]
   }
 }
@@ -68,11 +78,11 @@ Key changes:
 
 Three new methods using `client.cardkit.*` from `@larksuiteoapi/node-sdk` v1.60.0:
 
-| Method | SDK call | Purpose |
-|--------|----------|---------|
-| `createCard(cardJson: string)` | `cardkit.card.create` | Create card entity, return `card_id` |
+| Method                                                   | SDK call                       | Purpose                                 |
+| -------------------------------------------------------- | ------------------------------ | --------------------------------------- |
+| `createCard(cardJson: string)`                           | `cardkit.card.create`          | Create card entity, return `card_id`    |
 | `streamUpdateText(cardId, elementId, content, sequence)` | `cardkit.card.element.content` | Push full text for typewriter rendering |
-| `updateCardSettings(cardId, settings: string, sequence)` | `cardkit.card.settings` | Toggle `streaming_mode`, update config |
+| `updateCardSettings(cardId, settings: string, sequence)` | `cardkit.card.settings`        | Toggle `streaming_mode`, update config  |
 
 All wrapped in existing `call()` error handler. CardKit-specific error codes (300309, 200740, 200850, etc.) mapped to appropriate adapter errors.
 
