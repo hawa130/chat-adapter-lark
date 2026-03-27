@@ -54,3 +54,9 @@ export interface LarkRawMessage {
     }>
   }
 }
+
+/** Tracks a CardKit card entity for streaming and updates. */
+export interface CardKitCard {
+  cardId: string
+  elementId: string
+}
