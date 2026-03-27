@@ -1,7 +1,9 @@
-// Public API — populated as modules are implemented
+// Public API
 
 export type { LarkThreadId, LarkAdapterConfig, LarkRawMessage } from './types.ts'
 export { default as LarkApiClient } from './api-client.ts'
 export { default as LarkFormatConverter } from './format-converter.ts'
 export { default as cardMapper } from './card-mapper.ts'
 export { default as LarkAdapter } from './adapter.ts'
+export { default as createLarkAdapter } from './factory.ts'
+export { default } from './factory.ts'
