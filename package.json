@@ -33,7 +33,8 @@
   },
   "dependencies": {
     "@chat-adapter/shared": "^4.0.0",
-    "@larksuiteoapi/node-sdk": "^1.60.0"
+    "@larksuiteoapi/node-sdk": "^1.60.0",
+    "nanoid": "^5.1.7"
   },
   "devDependencies": {
     "@types/bun": "latest",

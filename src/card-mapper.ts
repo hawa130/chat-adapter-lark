@@ -1,11 +1,20 @@
+import { customAlphabet } from 'nanoid'
+
 /** Minimal shapes for card elements (JSX components, not importable as types). */
 interface CardChild {
+  align?: string[]
   alt?: string
   children?: CardChild[]
   content?: string
   disabled?: boolean
+  headers?: string[]
   id?: string
+  imageUrl?: string
+  initialOption?: string
   label?: string
+  options?: CardChild[]
+  placeholder?: string
+  rows?: string[][]
   style?: string
   subtitle?: string
   title?: string
@@ -16,54 +25,177 @@ interface CardChild {
 
 type LarkElement = Record<string, unknown>
 
-const COUNTER_START = 0
+const NANO_ID_SIZE = 12
+const MIN_PAGE_SIZE = 1
+const MAX_PAGE_SIZE = 10
 
-let elementCounter = COUNTER_START
+const generateId = customAlphabet(
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+  NANO_ID_SIZE,
+)
 
-const resetElementCounter = (): void => {
-  elementCounter = COUNTER_START
-}
-
-const nextElementId = (): string => `el_${String(elementCounter++)}`
+const nextElementId = (): string => `e${generateId()}`
 
 const buttonType = (style: string | undefined): string => {
   if (style === 'danger') {
     return 'danger'
   }
-  if (style === 'secondary') {
+  if (style === 'secondary' || style === 'default') {
     return 'default'
   }
-  return 'primary'
+  return 'primary_filled'
+}
+
+const buildCallbackValue = (btn: CardChild): Record<string, string> => {
+  const val: Record<string, string> = { id: btn.id ?? '' }
+  if (btn.value != null) {
+    val['action'] = String(btn.value)
+  }
+  return val
 }
 
 const mapButton = (btn: CardChild): LarkElement => {
   const el: LarkElement = {
+    behaviors: [{ type: 'callback', value: buildCallbackValue(btn) }],
     element_id: nextElementId(),
     tag: 'button',
-    text: { content: btn.label, tag: 'plain_text' },
+    text: { content: btn.label ?? '', tag: 'plain_text' },
     type: buttonType(btn.style),
   }
-  if (btn.value != null) {
-    el['behaviors'] = [{ type: 'callback', value: { action: String(btn.value) } }]
+  if (btn.disabled) {
+    el['disabled'] = true
   }
   return el
 }
 
-const mapSection = (el: CardChild): LarkElement | null => {
-  const texts = (el.children ?? [])
-    .map((child) => {
-      if ('content' in child) {
-        return child.content
-      }
-      return null
-    })
-    .filter(Boolean)
-    .join('\n')
-  if (!texts) {
+const mapSelect = (child: CardChild): LarkElement => {
+  const el: LarkElement = {
+    behaviors: [{ type: 'callback', value: { id: child.id ?? '' } }],
+    element_id: nextElementId(),
+    options: (child.options ?? []).map((opt) => ({
+      text: { content: opt.label ?? '', tag: 'plain_text' },
+      value: String(opt.value ?? ''),
+    })),
+    tag: 'select_static',
+  }
+  if (child.placeholder) {
+    el['placeholder'] = { content: child.placeholder, tag: 'plain_text' }
+  } else if (child.label) {
+    el['placeholder'] = { content: child.label, tag: 'plain_text' }
+  }
+  if (child.initialOption) {
+    el['initial_option'] = child.initialOption
+  }
+  return el
+}
+
+const mapActionChild = (child: CardChild): LarkElement | null => {
+  if (child.type === 'link-button') {
+    return {
+      behaviors: [{ default_url: child.url ?? '', type: 'open_url' }],
+      element_id: nextElementId(),
+      tag: 'button',
+      text: { content: child.label ?? '', tag: 'plain_text' },
+      type: buttonType(child.style),
+    }
+  }
+  if (child.type === 'select' || child.type === 'radio_select') {
+    return mapSelect(child)
+  }
+  return mapButton(child)
+}
+
+const mapFields = (child: CardChild): LarkElement[] =>
+  (child.children ?? []).map((field) => ({
+    background_style: 'default',
+    columns: [
+      {
+        elements: [
+          {
+            content: `**${field.label ?? ''}**`,
+            element_id: nextElementId(),
+            tag: 'markdown',
+          },
+        ],
+        tag: 'column',
+        vertical_align: 'top',
+        weight: 1,
+        width: 'weighted',
+      },
+      {
+        elements: [
+          {
+            content: String(field.value ?? ''),
+            element_id: nextElementId(),
+            tag: 'markdown',
+            text_align: 'right',
+          },
+        ],
+        tag: 'column',
+        vertical_align: 'top',
+        weight: 1,
+        width: 'weighted',
+      },
+    ],
+    flex_mode: 'none',
+    tag: 'column_set',
+  }))
+
+const mapTable = (child: CardChild): LarkElement | null => {
+  if (!child.headers?.length) {
     return null
   }
-  return { content: texts, element_id: nextElementId(), tag: 'markdown' }
+  const columns = child.headers.map((header, idx) => ({
+    data_type: 'text' as const,
+    display_name: header,
+    horizontal_align: child.align?.[idx] ?? 'left',
+    name: `col_${String(idx)}`,
+  }))
+  const tableRows = (child.rows ?? []).map((row) =>
+    Object.fromEntries(child.headers!.map((_hdr, idx) => [`col_${String(idx)}`, row[idx] ?? ''])),
+  )
+  return {
+    columns,
+    element_id: nextElementId(),
+    header_style: { bold: true, text_align: 'left' },
+    page_size: Math.min(Math.max(tableRows.length, MIN_PAGE_SIZE), MAX_PAGE_SIZE),
+    rows: tableRows,
+    tag: 'table',
+  }
 }
+
+const mapActions = (child: CardChild): LarkElement | null => {
+  const items = (child.children ?? [])
+    .map((actionChild) => mapActionChild(actionChild))
+    .filter((item): item is LarkElement => item != null)
+  if (!items.length) {
+    return null
+  }
+  return {
+    background_style: 'default',
+    columns: items.map((item) => ({
+      elements: [item],
+      tag: 'column',
+      vertical_align: 'top',
+      weight: 1,
+      width: 'auto',
+    })),
+    flex_mode: 'flow',
+    tag: 'column_set',
+  }
+}
+
+const flatMapChildren = (children: CardChild[]): LarkElement[] =>
+  children.flatMap((ch) => {
+    const result = mapChild(ch)
+    if (Array.isArray(result)) {
+      return result
+    }
+    if (result) {
+      return [result]
+    }
+    return []
+  })
 
 const mapChild = (child: CardChild): LarkElement | LarkElement[] | null => {
   switch (child.type) {
@@ -78,10 +210,20 @@ const mapChild = (child: CardChild): LarkElement | LarkElement[] | null => {
         img_key: child.url,
         tag: 'img',
       }
+    case 'link':
+      return {
+        content: `[${child.label ?? ''}](${child.url ?? ''})`,
+        element_id: nextElementId(),
+        tag: 'markdown',
+      }
+    case 'fields':
+      return mapFields(child)
+    case 'table':
+      return mapTable(child)
     case 'actions':
-      return (child.children ?? []).map((btn) => mapButton(btn))
+      return mapActions(child)
     case 'section':
-      return mapSection(child)
+      return flatMapChildren(child.children ?? [])
     default: {
       if ('content' in child && child.content) {
         return { content: child.content as string, element_id: nextElementId(), tag: 'markdown' }
@@ -92,24 +234,31 @@ const mapChild = (child: CardChild): LarkElement | LarkElement[] | null => {
 }
 
 const cardToLarkInteractive = (card: CardChild): Record<string, unknown> => {
-  resetElementCounter()
-  const elements = (card.children ?? []).flatMap((child) => {
-    const result = mapChild(child)
-    if (Array.isArray(result)) {
-      return result
-    }
-    if (result) {
-      return [result]
-    }
-    return []
-  })
+  const elements = flatMapChildren(card.children ?? [])
+
+  if (card.imageUrl) {
+    elements.unshift({
+      alt: { content: card.title ?? '', tag: 'plain_text' },
+      element_id: nextElementId(),
+      img_key: card.imageUrl,
+      tag: 'img',
+    })
+  }
+
   const result: Record<string, unknown> = {
     body: { elements },
     config: { update_multi: true },
     schema: '2.0',
   }
   if (card.title) {
-    result['header'] = { template: 'blue', title: { content: card.title, tag: 'plain_text' } }
+    const header: Record<string, unknown> = {
+      template: 'blue',
+      title: { content: card.title, tag: 'plain_text' },
+    }
+    if (card.subtitle) {
+      header['subtitle'] = { content: card.subtitle, tag: 'plain_text' }
+    }
+    result['header'] = header
   }
   return result
 }

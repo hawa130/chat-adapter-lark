@@ -5,144 +5,389 @@ const { cardToFallbackText, cardToLarkInteractive } = cardMapper
 
 type LarkEl = { tag: string } & Record<string, unknown>
 type LarkCard = { body: { elements: LarkEl[] }; config: Record<string, unknown>; schema: string }
+type ColumnSet = LarkEl & { columns: Array<{ elements: LarkEl[] }> }
 
 const byTag = (tag: string) => (el: { tag: string }) => el.tag === tag
 
+const ELEMENT_ID_PATTERN = /^e[A-Za-z0-9]+$/
+const MAX_ELEMENT_ID_LENGTH = 20
+const FIRST = 0
+const SECOND = 1
+const EXPECTED_TWO = 2
+
+const expectValidElementId = (el: LarkEl) => {
+  expect(el.element_id).toMatch(ELEMENT_ID_PATTERN)
+  expect(String(el.element_id).length).toBeLessThanOrEqual(MAX_ELEMENT_ID_LENGTH)
+}
+
+/** Get the first action child from an actions column_set. */
+const firstActionItem = (elements: LarkEl[]): LarkEl => {
+  const colSet = elements.find(byTag('column_set')) as ColumnSet
+  return colSet.columns.at(FIRST)!.elements.at(FIRST)!
+}
+
+/** Get the first element from elements array. */
+const firstOf = <TItem>(arr: TItem[]): TItem => arr.at(FIRST)!
+
+/** Get the second element from elements array. */
+const secondOf = <TItem>(arr: TItem[]): TItem => arr.at(SECOND)!
+
+/** Build a card with a single actions child. */
+const actionsCard = (actionChildren: Record<string, unknown>[]) => ({
+  children: [{ children: actionChildren, type: 'actions' as const }],
+  type: 'card' as const,
+})
+
 describe('cardToLarkInteractive', () => {
-  it('outputs schema 2.0 and config', () => {
-    const card = { children: [], type: 'card' as const }
-    const result = cardToLarkInteractive(card) as LarkCard
-    expect(result.schema).toBe('2.0')
-    expect(result.config).toMatchObject({ update_multi: true })
+  describe('basic elements', () => {
+    it('outputs schema 2.0 and config', () => {
+      const card = { children: [], type: 'card' as const }
+      const result = cardToLarkInteractive(card) as LarkCard
+      expect(result.schema).toBe('2.0')
+      expect(result.config).toMatchObject({ update_multi: true })
+    })
+
+    it('text produces markdown with valid element_id', () => {
+      const result = cardToLarkInteractive({
+        children: [{ content: 'Hello **world**', type: 'text' as const }],
+        type: 'card' as const,
+      }) as LarkCard
+      const mdEl = result.body.elements.find(byTag('markdown')) as LarkEl
+      expect(mdEl).toBeDefined()
+      expect(mdEl.content).toBe('Hello **world**')
+      expectValidElementId(mdEl)
+    })
+
+    it('divider produces hr', () => {
+      const result = cardToLarkInteractive({
+        children: [{ type: 'divider' as const }],
+        type: 'card' as const,
+      }) as LarkCard
+      const hrEl = result.body.elements.find(byTag('hr')) as LarkEl
+      expect(hrEl).toBeDefined()
+      expectValidElementId(hrEl)
+    })
+
+    it('image produces img', () => {
+      const result = cardToLarkInteractive({
+        children: [{ alt: 'A photo', type: 'image' as const, url: 'img_key_123' }],
+        type: 'card' as const,
+      }) as LarkCard
+      const imgEl = result.body.elements.find(byTag('img')) as LarkEl
+      expect(imgEl).toBeDefined()
+      expect(imgEl.img_key).toBe('img_key_123')
+      expectValidElementId(imgEl)
+    })
+
+    it('unknown component degrades to markdown if content exists', () => {
+      const result = cardToLarkInteractive({
+        children: [{ content: 'fallback', type: 'unknown_type' as const }],
+        type: 'card' as const,
+      }) as LarkCard
+      const mdEl = result.body.elements.find(byTag('markdown'))
+      expect(mdEl).toBeDefined()
+      expect(mdEl).toHaveProperty('element_id')
+    })
   })
 
-  it('card with text has element_id on markdown element', () => {
-    const card = {
-      children: [{ content: 'Hello **world**', style: undefined, type: 'text' as const }],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const mdEl = result.body.elements.find(byTag('markdown')) as LarkEl
-    expect(mdEl).toBeDefined()
-    expect(mdEl.content).toBe('Hello **world**')
-    expect(mdEl.element_id).toMatch(/^el_/)
+  describe('header', () => {
+    it('includes title with template', () => {
+      const result = cardToLarkInteractive({
+        children: [],
+        title: 'Test Card',
+        type: 'card' as const,
+      }) as Record<string, unknown>
+      expect(result.header).toMatchObject({
+        template: 'blue',
+        title: { content: 'Test Card', tag: 'plain_text' },
+      })
+    })
+
+    it('includes subtitle when provided', () => {
+      const result = cardToLarkInteractive({
+        children: [],
+        subtitle: 'Sub',
+        title: 'Title',
+        type: 'card' as const,
+      }) as Record<string, unknown>
+      const header = result.header as Record<string, unknown>
+      expect(header.subtitle).toMatchObject({ content: 'Sub', tag: 'plain_text' })
+    })
+
+    it('imageUrl inserts img at start of elements', () => {
+      const result = cardToLarkInteractive({
+        children: [{ content: 'text', type: 'text' as const }],
+        imageUrl: 'img_v3_xxx',
+        title: 'Card',
+        type: 'card' as const,
+      }) as LarkCard
+      const firstEl = firstOf(result.body.elements)
+      expect(firstEl.tag).toBe('img')
+      expect(firstEl.img_key).toBe('img_v3_xxx')
+    })
   })
 
-  it('card with divider has element_id on hr element', () => {
-    const card = {
-      children: [{ type: 'divider' as const }],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const hrEl = result.body.elements.find(byTag('hr'))
-    expect(hrEl).toBeDefined()
-    expect(hrEl).toHaveProperty('element_id')
+  describe('button mapping', () => {
+    it('primary maps to primary_filled', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'b', label: 'Click', style: 'primary', type: 'button' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).type).toBe('primary_filled')
+    })
+
+    it('danger maps to danger', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'b', label: 'Del', style: 'danger', type: 'button' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).type).toBe('danger')
+    })
+
+    it('default maps to default', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'b', label: 'Btn', style: 'default', type: 'button' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).type).toBe('default')
+    })
+
+    it('always has behaviors with id', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'my_btn', label: 'Click', type: 'button' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).behaviors).toEqual([
+        { type: 'callback', value: { id: 'my_btn' } },
+      ])
+    })
+
+    it('with value includes action in behaviors', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'btn1', label: 'Do it', type: 'button', value: 'my_action' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).behaviors).toEqual([
+        { type: 'callback', value: { action: 'my_action', id: 'btn1' } },
+      ])
+    })
+
+    it('disabled is mapped', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ disabled: true, id: 'b', label: 'Off', type: 'button' }]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).disabled).toBe(true)
+    })
   })
 
-  it('card with buttons flattens to standalone button elements (no action wrapper)', () => {
-    const card = {
-      children: [
-        {
-          children: [
-            {
-              disabled: false,
-              id: 'btn1',
-              label: 'Click me',
-              style: 'primary' as const,
-              type: 'button' as const,
-              value: undefined,
-            },
-          ],
-          type: 'actions' as const,
-        },
-      ],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const { elements } = result.body
-    expect(elements.find(byTag('action'))).toBeUndefined()
-    const btnEl = elements.find(byTag('button')) as LarkEl
-    expect(btnEl).toBeDefined()
-    expect((btnEl.text as LarkEl).content).toBe('Click me')
-    expect(btnEl.element_id).toMatch(/^el_/)
+  describe('actions layout', () => {
+    it('produces column_set with flex_mode flow and multiple columns', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([
+          { id: 'a', label: 'A', type: 'button' },
+          { id: 'b', label: 'B', type: 'button' },
+        ]),
+      ) as LarkCard
+      const colSet = result.body.elements.find(byTag('column_set')) as ColumnSet
+      expect(colSet).toBeDefined()
+      expect(colSet.flex_mode).toBe('flow')
+      expect(colSet.columns).toHaveLength(EXPECTED_TWO)
+    })
+
+    it('no action wrapper element exists', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ id: 'a', label: 'A', type: 'button' }]),
+      ) as LarkCard
+      expect(result.body.elements.find(byTag('action'))).toBeUndefined()
+    })
   })
 
-  it('button with value uses behaviors array', () => {
-    const card = {
-      children: [
-        {
-          children: [
-            {
-              label: 'Do it',
-              style: 'primary' as const,
-              type: 'button' as const,
-              value: 'my_action',
-            },
-          ],
-          type: 'actions' as const,
-        },
-      ],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const btnEl = result.body.elements.find(byTag('button')) as LarkEl
-    expect(btnEl.behaviors).toEqual([{ type: 'callback', value: { action: 'my_action' } }])
+  describe('link-button', () => {
+    it('maps to button with open_url behavior', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([{ label: 'Visit', type: 'link-button', url: 'https://example.com' }]),
+      ) as LarkCard
+      const btnEl = firstActionItem(result.body.elements)
+      expect(btnEl.tag).toBe('button')
+      expect(btnEl.behaviors).toEqual([{ default_url: 'https://example.com', type: 'open_url' }])
+    })
   })
 
-  it('card with image has element_id on img element', () => {
-    const card = {
-      children: [{ alt: 'A photo', type: 'image' as const, url: 'img_key_123' }],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const imgEl = result.body.elements.find(byTag('img')) as LarkEl
-    expect(imgEl).toBeDefined()
-    expect(imgEl.img_key).toBe('img_key_123')
-    expect(imgEl.element_id).toMatch(/^el_/)
+  describe('select', () => {
+    it('maps to select_static with options', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([
+          {
+            id: 'priority',
+            label: 'Priority',
+            options: [
+              { label: 'High', type: 'option', value: 'high' },
+              { label: 'Low', type: 'option', value: 'low' },
+            ],
+            type: 'select',
+          },
+        ]),
+      ) as LarkCard
+      const selectEl = firstActionItem(result.body.elements)
+      expect(selectEl.tag).toBe('select_static')
+      expect(selectEl.placeholder).toMatchObject({ content: 'Priority', tag: 'plain_text' })
+      expect(selectEl.options).toEqual([
+        { text: { content: 'High', tag: 'plain_text' }, value: 'high' },
+        { text: { content: 'Low', tag: 'plain_text' }, value: 'low' },
+      ])
+      expect(selectEl.behaviors).toEqual([{ type: 'callback', value: { id: 'priority' } }])
+    })
+
+    it('radio_select also maps to select_static', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([
+          {
+            id: 'status',
+            label: 'Status',
+            options: [{ label: 'Open', type: 'option', value: 'open' }],
+            type: 'radio_select',
+          },
+        ]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).tag).toBe('select_static')
+    })
+
+    it('initialOption sets initial_option', () => {
+      const result = cardToLarkInteractive(
+        actionsCard([
+          {
+            id: 'sel',
+            initialOption: 'opt1',
+            label: 'Pick',
+            options: [{ label: 'Opt1', type: 'option', value: 'opt1' }],
+            type: 'select',
+          },
+        ]),
+      ) as LarkCard
+      expect(firstActionItem(result.body.elements).initial_option).toBe('opt1')
+    })
   })
 
-  it('unknown component degrades to markdown if content exists', () => {
-    const card = {
-      children: [
-        {
-          children: [{ content: 'section text', style: undefined, type: 'text' as const }],
-          type: 'section' as const,
-        },
-      ],
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as LarkCard
-    const mdEl = result.body.elements.find(byTag('markdown'))
-    expect(mdEl).toBeDefined()
-    expect(mdEl).toHaveProperty('element_id')
+  describe('section', () => {
+    it('recursively expands all children to parent level', () => {
+      const result = cardToLarkInteractive({
+        children: [
+          {
+            children: [
+              { content: 'section text', type: 'text' as const },
+              { alt: 'pic', type: 'image' as const, url: 'img_key' },
+            ],
+            type: 'section' as const,
+          },
+        ],
+        type: 'card' as const,
+      }) as LarkCard
+      expect(result.body.elements).toHaveLength(EXPECTED_TWO)
+      expect(firstOf(result.body.elements).tag).toBe('markdown')
+      expect(secondOf(result.body.elements).tag).toBe('img')
+    })
+
+    it('nested section flattens correctly', () => {
+      const result = cardToLarkInteractive({
+        children: [
+          {
+            children: [
+              {
+                children: [{ content: 'deep', type: 'text' as const }],
+                type: 'section' as const,
+              },
+            ],
+            type: 'section' as const,
+          },
+        ],
+        type: 'card' as const,
+      }) as LarkCard
+      expect(result.body.elements).toHaveLength(SECOND)
+      expect(firstOf(result.body.elements).content).toBe('deep')
+    })
   })
 
-  it('header includes title with template', () => {
-    const card = {
-      children: [],
-      title: 'Test Card',
-      type: 'card' as const,
-    }
-    const result = cardToLarkInteractive(card) as Record<string, unknown>
-    expect(result.header).toMatchObject({
-      template: 'blue',
-      title: { content: 'Test Card', tag: 'plain_text' },
+  describe('link', () => {
+    it('maps to markdown with [label](url)', () => {
+      const result = cardToLarkInteractive({
+        children: [{ label: 'View', type: 'link' as const, url: 'https://example.com' }],
+        type: 'card' as const,
+      }) as LarkCard
+      const mdEl = result.body.elements.find(byTag('markdown')) as LarkEl
+      expect(mdEl.content).toBe('[View](https://example.com)')
+    })
+  })
+
+  describe('fields', () => {
+    it('maps to column_set rows with label left and value right', () => {
+      const result = cardToLarkInteractive({
+        children: [
+          {
+            children: [
+              { label: 'Name', type: 'field' as const, value: 'John' },
+              { label: 'Role', type: 'field' as const, value: 'Dev' },
+            ],
+            type: 'fields' as const,
+          },
+        ],
+        type: 'card' as const,
+      }) as LarkCard
+      const colSets = result.body.elements.filter(byTag('column_set'))
+      expect(colSets).toHaveLength(EXPECTED_TWO)
+      const firstRow = firstOf(colSets) as ColumnSet
+      expect(firstRow.columns).toHaveLength(EXPECTED_TWO)
+      const labelCol = firstOf(firstRow.columns)
+      const valueCol = secondOf(firstRow.columns)
+      expect(firstOf(labelCol.elements).content).toBe('**Name**')
+      expect(firstOf(valueCol.elements).content).toBe('John')
+      expect(firstOf(valueCol.elements).text_align).toBe('right')
+    })
+  })
+
+  describe('table', () => {
+    it('maps to lark table component', () => {
+      const result = cardToLarkInteractive({
+        children: [
+          {
+            headers: ['Name', 'Age'],
+            rows: [
+              ['Alice', '30'],
+              ['Bob', '25'],
+            ],
+            type: 'table' as const,
+          },
+        ],
+        type: 'card' as const,
+      }) as LarkCard
+      const tableEl = result.body.elements.find(byTag('table')) as LarkEl
+      expect(tableEl).toBeDefined()
+      expectValidElementId(tableEl)
+      expect(tableEl.columns).toEqual([
+        { data_type: 'text', display_name: 'Name', horizontal_align: 'left', name: 'col_0' },
+        { data_type: 'text', display_name: 'Age', horizontal_align: 'left', name: 'col_1' },
+      ])
+      expect(tableEl.rows).toEqual([
+        { col_0: 'Alice', col_1: '30' },
+        { col_0: 'Bob', col_1: '25' },
+      ])
+    })
+
+    it('empty headers produces no elements', () => {
+      const result = cardToLarkInteractive({
+        children: [{ headers: [], rows: [], type: 'table' as const }],
+        type: 'card' as const,
+      }) as LarkCard
+      expect(result.body.elements).toHaveLength(FIRST)
     })
   })
 })
 
 describe('cardToFallbackText', () => {
   it('extracts title and all text content', () => {
-    const card = {
+    const result = cardToFallbackText({
       children: [
-        { content: 'Body text here', style: undefined, type: 'text' as const },
+        { content: 'Body text here', type: 'text' as const },
         { type: 'divider' as const },
       ],
       subtitle: 'A subtitle',
       title: 'My Card',
       type: 'card' as const,
-    }
-    const result = cardToFallbackText(card)
+    })
     expect(result).toContain('My Card')
     expect(result).toContain('Body text here')
   })
