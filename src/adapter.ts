@@ -581,10 +581,14 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     })
   }
 
+  private extractImageKey(uploadRes: unknown): string {
+    const data = uploadRes as { data?: { image_key?: string } }
+    return data.data?.image_key ?? ''
+  }
+
   private async sendUploadedImage(decoded: LarkThreadId, buf: Buffer): Promise<LarkMessageResult> {
     const uploadRes = await this.api.uploadImage(buf)
-    const uploadData = uploadRes as { data?: { image_key?: string } }
-    const imageKey = uploadData.data?.image_key ?? ''
+    const imageKey = this.extractImageKey(uploadRes)
     return this.sendOrReply(decoded, 'image', JSON.stringify({ image_key: imageKey }))
   }
 
@@ -621,8 +625,9 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
   ): Promise<LarkMessageResult> {
     const card = extractCard(message)
     if (card) {
-      await this.uploadCardImages(card as Record<string, unknown>)
-      const cardJson = cardMapper.cardToLarkInteractive(card)
+      const cardCopy = structuredClone(card)
+      await this.uploadCardImages(cardCopy as Record<string, unknown>)
+      const cardJson = cardMapper.cardToLarkInteractive(cardCopy)
       return this.sendCardMessage(decoded, cardJson)
     }
     return this.sendTextMessage(decoded, message)
@@ -632,8 +637,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     const response = await fetch(url)
     const buf = Buffer.from(await response.arrayBuffer())
     const uploadRes = await this.api.uploadImage(buf)
-    const data = uploadRes as { data?: { image_key?: string } }
-    return data.data?.image_key ?? null
+    return this.extractImageKey(uploadRes) || null
   }
 
   private async uploadUrlToImageKey(node: Record<string, unknown>, field: string): Promise<void> {
@@ -651,14 +655,16 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     }
   }
 
-  private async uploadCardImages(node: Record<string, unknown>): Promise<void> {
+  private async uploadCardImages(node: Record<string, unknown>, isRoot = true): Promise<void> {
     if (node['type'] === 'image') {
       await this.uploadUrlToImageKey(node, 'url')
     }
-    await this.uploadUrlToImageKey(node, 'imageUrl')
+    if (isRoot) {
+      await this.uploadUrlToImageKey(node, 'imageUrl')
+    }
     const children = node['children'] as Array<Record<string, unknown>> | undefined
     if (children) {
-      await Promise.all(children.map((child) => this.uploadCardImages(child)))
+      await Promise.all(children.map((child) => this.uploadCardImages(child, false)))
     }
   }
 

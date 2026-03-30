@@ -34,7 +34,7 @@ const generateId = customAlphabet(
   NANO_ID_SIZE,
 )
 
-const nextElementId = (): string => `e${generateId()}`
+const nextElementId = (): string => `el_${generateId()}`
 
 const buttonType = (style: string | undefined): string => {
   if (style === 'danger') {
@@ -54,9 +54,9 @@ const buildCallbackValue = (btn: CardChild): Record<string, string> => {
   return val
 }
 
-const mapButton = (btn: CardChild): LarkElement => {
+const mapButton = (btn: CardChild, behaviors?: LarkElement[]): LarkElement => {
   const el: LarkElement = {
-    behaviors: [{ type: 'callback', value: buildCallbackValue(btn) }],
+    behaviors: behaviors ?? [{ type: 'callback', value: buildCallbackValue(btn) }],
     element_id: nextElementId(),
     tag: 'button',
     text: { content: btn.label ?? '', tag: 'plain_text' },
@@ -69,6 +69,7 @@ const mapButton = (btn: CardChild): LarkElement => {
 }
 
 const mapSelect = (child: CardChild): LarkElement => {
+  const placeholderText = child.placeholder ?? child.label
   const el: LarkElement = {
     behaviors: [{ type: 'callback', value: { id: child.id ?? '' } }],
     element_id: nextElementId(),
@@ -78,10 +79,8 @@ const mapSelect = (child: CardChild): LarkElement => {
     })),
     tag: 'select_static',
   }
-  if (child.placeholder) {
-    el['placeholder'] = { content: child.placeholder, tag: 'plain_text' }
-  } else if (child.label) {
-    el['placeholder'] = { content: child.label, tag: 'plain_text' }
+  if (placeholderText) {
+    el['placeholder'] = { content: placeholderText, tag: 'plain_text' }
   }
   if (child.initialOption) {
     el['initial_option'] = child.initialOption
@@ -91,13 +90,7 @@ const mapSelect = (child: CardChild): LarkElement => {
 
 const mapActionChild = (child: CardChild): LarkElement | null => {
   if (child.type === 'link-button') {
-    return {
-      behaviors: [{ default_url: child.url ?? '', type: 'open_url' }],
-      element_id: nextElementId(),
-      tag: 'button',
-      text: { content: child.label ?? '', tag: 'plain_text' },
-      type: buttonType(child.style),
-    }
+    return mapButton(child, [{ default_url: child.url ?? '', type: 'open_url' }])
   }
   if (child.type === 'select' || child.type === 'radio_select') {
     return mapSelect(child)

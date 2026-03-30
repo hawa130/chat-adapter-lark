@@ -9,10 +9,11 @@ type ColumnSet = LarkEl & { columns: Array<{ elements: LarkEl[] }> }
 
 const byTag = (tag: string) => (el: { tag: string }) => el.tag === tag
 
-const ELEMENT_ID_PATTERN = /^e[A-Za-z0-9]+$/
+const ELEMENT_ID_PATTERN = /^el_[A-Za-z0-9]+$/
 const MAX_ELEMENT_ID_LENGTH = 20
 const FIRST = 0
 const SECOND = 1
+const EXPECTED_ONE = 1
 const EXPECTED_TWO = 2
 
 const expectValidElementId = (el: LarkEl) => {
@@ -297,7 +298,7 @@ describe('cardToLarkInteractive', () => {
         ],
         type: 'card' as const,
       }) as LarkCard
-      expect(result.body.elements).toHaveLength(SECOND)
+      expect(result.body.elements).toHaveLength(EXPECTED_ONE)
       expect(firstOf(result.body.elements).content).toBe('deep')
     })
   })
