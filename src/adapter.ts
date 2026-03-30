@@ -224,7 +224,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     this.dedup.clear()
   }
 
-  // -- Thread ID encoding (7A) --
+  // -- Thread ID encoding --
 
   encodeThreadId(data: LarkThreadId): string {
     const base = `lark:${toBase64Url(data.chatId)}`
@@ -253,7 +253,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.decodeThreadId(threadId).chatId
   }
 
-  // -- Webhook handling (7B) --
+  // -- Webhook handling --
 
   async handleWebhook(request: Request, options?: WebhookOptions): Promise<Response> {
     const body = await this.parseWebhookBody(request.clone())
@@ -266,7 +266,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.handleEvent(body, request, options)
   }
 
-  // -- Message parsing (7C) --
+  // -- Message parsing --
 
   parseMessage(raw: LarkRawMessage): Message<LarkRaw> {
     const msg = raw.message
@@ -292,7 +292,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     })
   }
 
-  // -- Message sending (7D) --
+  // -- Message sending --
 
   async postMessage(
     threadId: string,
@@ -325,7 +325,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     await this.api.deleteMessage(messageId)
   }
 
-  // -- Reactions (7E) --
+  // -- Reactions --
 
   async addReaction(
     _threadId: string,
@@ -348,7 +348,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     }
   }
 
-  // -- Fetch methods (7F) --
+  // -- Fetch methods --
 
   async fetchMessages(threadId: string, options?: FetchOptions): Promise<FetchResult<LarkRaw>> {
     const { chatId } = this.decodeThreadId(threadId)
@@ -393,7 +393,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     }
   }
 
-  // -- DM (7F) --
+  // -- DM --
 
   async openDM(userId: string): Promise<string> {
     const res = await this.api.createP2PChat(userId)
@@ -406,7 +406,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.dmCache.has(this.decodeThreadId(threadId).chatId)
   }
 
-  // -- Misc (7F) --
+  // -- Misc --
 
   async startTyping(_threadId?: string, _status?: string): Promise<void> {
     // Lark has no typing indicator API — no-op
@@ -416,7 +416,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.converter.fromAst(content)
   }
 
-  // -- Streaming (7G) --
+  // -- Streaming --
 
   async stream(
     threadId: string,
@@ -448,7 +448,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return { id: messageId, raw, threadId }
   }
 
-  // -- Ephemeral (7H) --
+  // -- Ephemeral --
 
   async postEphemeral(
     threadId: string,
