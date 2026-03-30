@@ -209,7 +209,8 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
       domain: config.domain,
     })
     this.dispatcher = new EventDispatcher({
-      encryptKey: config.encryptKey ?? '',
+      encryptKey: config.encryptKey,
+      verificationToken: config.verificationToken,
     })
     this.registerEventHandlers()
   }

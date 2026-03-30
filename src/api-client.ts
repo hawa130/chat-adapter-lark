@@ -81,10 +81,10 @@ class LarkApiClient {
     )
   }
 
-  async updateMessage(messageId: string, _msgType: string, content: string) {
+  async updateMessage(messageId: string, msgType: string, content: string) {
     return this.call(() =>
-      this.client.im.message.patch({
-        data: { content },
+      this.client.im.message.update({
+        data: { content, msg_type: msgType },
         path: { message_id: messageId },
       }),
     )

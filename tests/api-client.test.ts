@@ -58,11 +58,11 @@ describe('LarkApiClient', () => {
     expect(result).toMatchObject({ data: { message_id: 'om_reply' } })
   })
 
-  it('updateMessage — patches message content', async () => {
+  it('updateMessage — edits message content via PUT', async () => {
     let captured: unknown = undefined
     server.use(
       tokenHandler,
-      http.patch(`${BASE}/open-apis/im/v1/messages/:id`, async ({ params, request }) => {
+      http.put(`${BASE}/open-apis/im/v1/messages/:id`, async ({ params, request }) => {
         captured = { body: await request.json(), id: params['id'] }
         return HttpResponse.json({ code: 0 })
       }),
@@ -72,7 +72,7 @@ describe('LarkApiClient', () => {
     await client.updateMessage('om_msg1', 'text', '{"text":"updated"}')
 
     expect(captured).toMatchObject({
-      body: { content: '{"text":"updated"}' },
+      body: { content: '{"text":"updated"}', msg_type: 'text' },
       id: 'om_msg1',
     })
   })

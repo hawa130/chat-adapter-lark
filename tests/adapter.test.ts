@@ -360,7 +360,7 @@ describe('LarkAdapter', () => {
       let editedId: unknown = undefined
       server.use(
         tokenHandler,
-        http.patch(`${BASE}/open-apis/im/v1/messages/:id`, ({ params }) => {
+        http.put(`${BASE}/open-apis/im/v1/messages/:id`, ({ params }) => {
           editedId = params['id']
           return HttpResponse.json({ code: 0 })
         }),
