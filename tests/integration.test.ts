@@ -60,7 +60,7 @@ const sendEvent = async (adapter: LarkAdapter, body: unknown): Promise<void> => 
     },
   }
   await adapter.handleWebhook(makeRequest(body), options)
-  await Promise.allSettled(promises) // eslint-disable-line promise/avoid-new
+  await Promise.allSettled(promises)
 }
 
 const initAdapter = async (adapter: LarkAdapter) => {

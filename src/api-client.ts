@@ -66,8 +66,7 @@ class LarkApiClient {
   async sendMessage(chatId: string, msgType: string, content: string) {
     return this.call(() =>
       this.client.im.message.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: { content, msg_type: msgType as any, receive_id: chatId },
+        data: { content, msg_type: msgType, receive_id: chatId },
         params: { receive_id_type: 'chat_id' },
       }),
     )
@@ -76,8 +75,7 @@ class LarkApiClient {
   async replyMessage(messageId: string, msgType: string, content: string) {
     return this.call(() =>
       this.client.im.message.reply({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: { content, msg_type: msgType as any },
+        data: { content, msg_type: msgType },
         path: { message_id: messageId },
       }),
     )
@@ -147,20 +145,22 @@ class LarkApiClient {
     )
   }
 
-  async uploadImage(image: Buffer | ReadableStream) {
+  async uploadImage(image: Buffer) {
     return this.call(() =>
       this.client.im.image.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: { image: image as any, image_type: 'message' },
+        data: { image, image_type: 'message' },
       }),
     )
   }
 
-  async uploadFile(file: Buffer | ReadableStream, fileName: string, fileType: string) {
+  async uploadFile(file: Buffer, fileName: string, fileType: string) {
     return this.call(() =>
       this.client.im.file.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: { file: file as any, file_name: fileName, file_type: fileType as any },
+        data: {
+          file,
+          file_name: fileName,
+          file_type: fileType as 'opus' | 'mp4' | 'pdf' | 'doc' | 'xls' | 'ppt' | 'stream',
+        },
       }),
     )
   }

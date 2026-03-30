@@ -199,7 +199,7 @@ describe('LarkAdapter', () => {
 
       expect((await adapter.handleWebhook(makeRequest(event), options)).status).toBe(HTTP_OK)
       expect((await adapter.handleWebhook(makeRequest(event), options)).status).toBe(HTTP_OK)
-      await Promise.allSettled(promises) // eslint-disable-line promise/avoid-new
+      await Promise.allSettled(promises)
       expect(mockChat.processMessage).toHaveBeenCalledTimes(ONCE)
     })
 
@@ -225,14 +225,14 @@ describe('LarkAdapter', () => {
 
       const res = await adapter.handleWebhook(makeRequest(event), options)
       expect(res.status).toBe(HTTP_OK)
-      await Promise.allSettled(promises) // eslint-disable-line promise/avoid-new
+      await Promise.allSettled(promises)
       expect(mockChat.processReaction).toHaveBeenCalledTimes(ONCE)
     })
   })
 
   // -- 7C: Message parsing --
   describe('parseMessage', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -320,7 +320,7 @@ describe('LarkAdapter', () => {
 
   // -- 7D: Message sending --
   describe('message sending', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -328,7 +328,7 @@ describe('LarkAdapter', () => {
     })
 
     it('postMessage sends text to chat', async () => {
-      let captured = undefined as unknown
+      let captured: unknown = undefined
       server.use(
         tokenHandler,
         http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
@@ -343,7 +343,7 @@ describe('LarkAdapter', () => {
     })
 
     it('postMessage replies when rootMessageId present', async () => {
-      let replyTo = undefined as unknown
+      let replyTo: unknown = undefined
       server.use(
         tokenHandler,
         http.post(`${BASE}/open-apis/im/v1/messages/:id/reply`, ({ params }) => {
@@ -357,7 +357,7 @@ describe('LarkAdapter', () => {
     })
 
     it('editMessage calls updateMessage', async () => {
-      let editedId = undefined as unknown
+      let editedId: unknown = undefined
       server.use(
         tokenHandler,
         http.patch(`${BASE}/open-apis/im/v1/messages/:id`, ({ params }) => {
@@ -371,7 +371,7 @@ describe('LarkAdapter', () => {
     })
 
     it('deleteMessage calls delete API', async () => {
-      let deletedId = undefined as unknown
+      let deletedId: unknown = undefined
       server.use(
         tokenHandler,
         http.delete(`${BASE}/open-apis/im/v1/messages/:id`, ({ params }) => {
@@ -385,7 +385,7 @@ describe('LarkAdapter', () => {
     })
 
     it('postMessage with card sends via card_id', async () => {
-      let captured = undefined as unknown
+      let captured: unknown = undefined
       server.use(
         tokenHandler,
         createCardHandler,
@@ -410,7 +410,7 @@ describe('LarkAdapter', () => {
 
   // -- 7E: Reactions --
   describe('reactions', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -418,7 +418,7 @@ describe('LarkAdapter', () => {
     })
 
     it('addReaction sends emoji type', async () => {
-      let captured = undefined as unknown
+      let captured: unknown = undefined
       server.use(
         tokenHandler,
         http.post(`${BASE}/open-apis/im/v1/messages/:id/reactions`, async ({ request }) => {
@@ -432,7 +432,7 @@ describe('LarkAdapter', () => {
     })
 
     it('addReaction handles EmojiValue object', async () => {
-      let captured = undefined as unknown
+      let captured: unknown = undefined
       server.use(
         tokenHandler,
         http.post(`${BASE}/open-apis/im/v1/messages/:id/reactions`, async ({ request }) => {
@@ -447,7 +447,7 @@ describe('LarkAdapter', () => {
     })
 
     it('removeReaction lists then deletes', async () => {
-      let deletedReactionId = undefined as unknown
+      let deletedReactionId: unknown = undefined
       server.use(
         tokenHandler,
         http.get(`${BASE}/open-apis/im/v1/messages/:id/reactions`, () =>
@@ -471,7 +471,7 @@ describe('LarkAdapter', () => {
 
   // -- 7F: Fetch methods --
   describe('fetch methods', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -487,7 +487,11 @@ describe('LarkAdapter', () => {
             data: {
               has_more: true,
               items: [
-                { content: '{"text":"msg1"}', create_time: '1700000000000', message_id: 'om_1' },
+                {
+                  body: { content: '{"text":"msg1"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_1',
+                },
               ],
               page_token: 'next-tok',
             },
@@ -522,7 +526,7 @@ describe('LarkAdapter', () => {
             data: {
               items: [
                 {
-                  content: '{"text":"fetched"}',
+                  body: { content: '{"text":"fetched"}' },
                   create_time: '1700000000000',
                   message_id: 'om_f1',
                 },
@@ -557,7 +561,7 @@ describe('LarkAdapter', () => {
 
   // -- 7F: DM --
   describe('DM', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -605,7 +609,7 @@ describe('LarkAdapter', () => {
 
   // -- 7G: Streaming --
   describe('stream', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -614,7 +618,7 @@ describe('LarkAdapter', () => {
 
     it('creates streaming card, sends updates, then closes streaming', async () => {
       const streamUpdates: Array<{ content: string; sequence: number }> = []
-      let settingsCaptured = undefined as unknown
+      let settingsCaptured: unknown = undefined
 
       server.use(
         tokenHandler,
@@ -679,7 +683,7 @@ describe('LarkAdapter', () => {
 
   // -- 7H: Ephemeral --
   describe('ephemeral', () => {
-    let adapter = undefined as unknown as LarkAdapter
+    let adapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -687,7 +691,7 @@ describe('LarkAdapter', () => {
     })
 
     it('postEphemeral sends to correct user', async () => {
-      let captured = undefined as unknown
+      let captured: unknown = undefined
       server.use(
         tokenHandler,
         http.post(`${BASE}/open-apis/ephemeral/v1/send`, async ({ request }) => {

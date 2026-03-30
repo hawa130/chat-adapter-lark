@@ -95,10 +95,12 @@ export default class LarkFormatConverter extends BaseFormatConverter {
     return stringifyMarkdown(ast)
   }
 
-  renderForSend(message: { card?: unknown; text?: string }): { content: string; msgType: string } {
+  renderForSend(message: { card?: CardChild; text?: string }): {
+    content: string
+    msgType: string
+  } {
     if (message.card) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const interactive = cardMapper.cardToLarkInteractive(message.card as any)
+      const interactive = cardMapper.cardToLarkInteractive(message.card)
       return { content: JSON.stringify(interactive), msgType: 'interactive' }
     }
     return { content: JSON.stringify({ text: message.text ?? '' }), msgType: 'text' }

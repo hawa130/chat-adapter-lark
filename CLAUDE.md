@@ -30,3 +30,9 @@ After writing or modifying code, always run:
 1. `bun run fmt` — format changed files
 2. `bun run lint` — ensure no lint errors or warnings
 3. `bun run test` — ensure all tests pass
+
+## Type Safety
+
+- Prefer `as T` over `as any`. If a double assertion (`as unknown as T`) is needed, the type model is wrong — fix the types instead.
+- When SDK types are inlined or missing, define your own interfaces and verify against official API docs.
+- Test fixtures must match real API response shapes — do not simplify or assume field nesting.

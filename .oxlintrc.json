@@ -38,7 +38,11 @@
     // restriction: 禁止 any & import 规范
     "typescript/no-explicit-any": "error",
     "typescript/no-import-type-side-effects": "error",
-    "typescript/non-nullable-type-assertion-style": "error"
+    "typescript/non-nullable-type-assertion-style": "error",
+
+    // style: import 相关
+    "no-duplicate-imports": ["warn", { "allowSeparateTypeImports": true }],
+    "sort-imports": "off"
   },
   "overrides": [
     {

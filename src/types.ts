@@ -55,6 +55,37 @@ export interface LarkRawMessage {
   }
 }
 
+/** Message item from Lark REST API (im/v1/messages list/get). */
+export interface LarkMessageItem {
+  message_id?: string
+  root_id?: string
+  parent_id?: string
+  thread_id?: string
+  msg_type?: string
+  create_time?: string
+  update_time?: string
+  deleted?: boolean
+  updated?: boolean
+  chat_id?: string
+  sender?: {
+    id: string
+    id_type: string
+    sender_type: string
+    tenant_key?: string
+  }
+  body?: {
+    content: string
+  }
+  mentions?: Array<{
+    key: string
+    id: string
+    id_type: string
+    name: string
+    tenant_key?: string
+  }>
+  upper_message_id?: string
+}
+
 /** Tracks a CardKit card entity for streaming and updates. */
 export interface CardKitCard {
   cardId: string

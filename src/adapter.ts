@@ -1,4 +1,3 @@
-/* eslint-disable no-duplicate-imports, sort-imports */
 import type {
   Adapter,
   AdapterPostableMessage,
@@ -16,7 +15,7 @@ import type {
   ThreadInfo,
   WebhookOptions,
 } from 'chat'
-import type { LarkAdapterConfig, LarkRawMessage, LarkThreadId } from './types.ts'
+import type { LarkAdapterConfig, LarkMessageItem, LarkRawMessage, LarkThreadId } from './types.ts'
 import type { PlatformName } from '@chat-adapter/shared'
 import { ValidationError, extractCard, extractFiles, toBuffer } from '@chat-adapter/shared'
 import { EventDispatcher } from '@larksuiteoapi/node-sdk'
@@ -26,7 +25,6 @@ import LarkApiClient from './api-client.ts'
 import LarkFormatConverter from './format-converter.ts'
 import bridgeWebhook from './event-bridge.ts'
 import cardMapper from './card-mapper.ts'
-/* eslint-enable no-duplicate-imports, sort-imports */
 
 const ADAPTER_NAME = 'lark'
 const DEDUP_CAPACITY = 500
@@ -40,6 +38,20 @@ const FIRST_ITEM_INDEX = 0
 const HTTP_BAD_REQUEST = 400
 const HTTP_OK = 200
 const LAST_INDEX = -1
+
+/** Response shape from Lark message send/reply APIs. */
+interface LarkMessageResult {
+  code?: number
+  data?: { message_id?: string }
+  msg?: string
+}
+
+/** Response shape from Lark CardKit create API. */
+interface LarkCardResult {
+  code?: number
+  data?: { card_id: string }
+  msg?: string
+}
 
 const toBase64Url = (str: string): string => Buffer.from(str).toString('base64url')
 
@@ -298,9 +310,8 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     )
     const lastFileResult = fileResults.at(LAST_INDEX) ?? null
     const textResult = await this.sendMessageContent(decoded, message)
-    const finalResult = lastFileResult ?? textResult
-    const data = finalResult as { data?: { message_id?: string } }
-    return { id: data.data?.message_id ?? '', raw: finalResult as LarkRawMessage, threadId }
+    const result = lastFileResult ?? textResult
+    return { id: result.data?.message_id ?? '', raw: result as unknown as LarkRawMessage, threadId }
   }
 
   async editMessage(
@@ -352,12 +363,12 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     const { chatId } = this.decodeThreadId(threadId)
     const res = await this.api.listMessages(chatId, options?.cursor, options?.limit)
     const data = res as {
-      data?: { has_more?: boolean; items?: Array<Record<string, unknown>>; page_token?: string }
+      data?: { has_more?: boolean; items?: LarkMessageItem[]; page_token?: string }
     }
     const messages = (data.data?.items ?? []).map((item) => this.itemToMessage(item, threadId))
     return {
       messages,
-      nextCursor: data.data?.has_more ? data.data.page_token : undefined, // eslint-disable-line no-ternary
+      nextCursor: (data.data?.has_more && data.data.page_token) || undefined,
     }
   }
 
@@ -376,7 +387,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
 
   async fetchMessage(threadId: string, messageId: string): Promise<Message<LarkRawMessage> | null> {
     const res = await this.api.getMessage(messageId)
-    const data = res as { data?: { items?: Array<Record<string, unknown>> } }
+    const data = res as { data?: { items?: LarkMessageItem[] } }
     const item = data.data?.items?.[FIRST_ITEM_INDEX]
     if (!item) {
       return null
@@ -574,7 +585,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     })
   }
 
-  private async sendUploadedImage(decoded: LarkThreadId, buf: Buffer): Promise<unknown> {
+  private async sendUploadedImage(decoded: LarkThreadId, buf: Buffer): Promise<LarkMessageResult> {
     const uploadRes = await this.api.uploadImage(buf)
     const uploadData = uploadRes as { data?: { image_key?: string } }
     const imageKey = uploadData.data?.image_key ?? ''
@@ -585,7 +596,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     decoded: LarkThreadId,
     buf: Buffer,
     file: FileUpload,
-  ): Promise<unknown> {
+  ): Promise<LarkMessageResult> {
     const mime = file.mimeType ?? ''
     const uploadRes = await this.api.uploadFile(buf, file.filename, mimeToLarkFileType(mime))
     const uploadData = uploadRes as { data?: { file_key?: string } }
@@ -593,7 +604,10 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     return this.sendOrReply(decoded, 'file', JSON.stringify({ file_key: fileKey }))
   }
 
-  private async uploadAndSendFile(decoded: LarkThreadId, file: FileUpload): Promise<unknown> {
+  private async uploadAndSendFile(
+    decoded: LarkThreadId,
+    file: FileUpload,
+  ): Promise<LarkMessageResult | null> {
     const buf = await toBuffer(file.data, { platform: ADAPTER_NAME as PlatformName })
     if (!buf) {
       return null
@@ -608,7 +622,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
   private async sendMessageContent(
     decoded: LarkThreadId,
     message: AdapterPostableMessage,
-  ): Promise<unknown> {
+  ): Promise<LarkMessageResult> {
     const cardJson = renderCardMessage(message)
     if (cardJson) {
       return this.sendCardMessage(decoded, cardJson)
@@ -619,10 +633,9 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
   private async sendCardMessage(
     decoded: LarkThreadId,
     cardJson: Record<string, unknown>,
-  ): Promise<unknown> {
-    const res = await this.api.createCard(JSON.stringify(cardJson))
-    const cardData = res as { data?: { card_id?: string } }
-    const cardId = cardData.data?.card_id ?? ''
+  ): Promise<LarkMessageResult> {
+    const res = (await this.api.createCard(JSON.stringify(cardJson))) as LarkCardResult
+    const cardId = res.data?.card_id ?? ''
     const content = JSON.stringify({ data: { card_id: cardId }, type: 'card' })
     return this.sendOrReply(decoded, 'interactive', content)
   }
@@ -630,7 +643,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
   private async sendTextMessage(
     decoded: LarkThreadId,
     message: AdapterPostableMessage,
-  ): Promise<unknown> {
+  ): Promise<LarkMessageResult> {
     const { content, msgType } = renderMessage(message, this.converter)
     return this.sendOrReply(decoded, msgType, content)
   }
@@ -645,20 +658,18 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
       config: { streaming_mode: true, update_multi: true },
       schema: '2.0',
     }
-    const res = await this.api.createCard(JSON.stringify(cardJson))
-    const cardData = res as { data?: { card_id?: string } }
-    const cardId = cardData.data?.card_id ?? ''
+    const res = (await this.api.createCard(JSON.stringify(cardJson))) as LarkCardResult
+    const cardId = res.data?.card_id ?? ''
     const content = JSON.stringify({ data: { card_id: cardId }, type: 'card' })
     const sendRes = await this.sendOrReply(decoded, 'interactive', content)
-    const msgData = sendRes as { data?: { message_id?: string } }
-    return { cardId, messageId: msgData.data?.message_id ?? '' }
+    return { cardId, messageId: sendRes.data?.message_id ?? '' }
   }
 
   private async sendOrReply(
     decoded: LarkThreadId,
     msgType: string,
     content: string,
-  ): Promise<unknown> {
+  ): Promise<LarkMessageResult> {
     if (decoded.rootMessageId) {
       return this.api.replyMessage(decoded.rootMessageId, msgType, content)
     }
@@ -676,18 +687,19 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRawMessage
     )
   }
 
-  private itemToMessage(item: Record<string, unknown>, threadId: string): Message<LarkRawMessage> {
+  private itemToMessage(item: LarkMessageItem, threadId: string): Message<LarkRawMessage> {
+    const content = item.body?.content ?? ''
     return new Message<LarkRawMessage>({
       attachments: [],
       author: unknownAuthor(),
-      formatted: this.converter.toAst(String(item['content'] ?? '')),
-      id: String(item['message_id'] ?? ''),
+      formatted: this.converter.toAst(content),
+      id: item.message_id ?? '',
       metadata: {
-        dateSent: new Date(Number(item['create_time'] ?? '0')),
+        dateSent: new Date(Number(item.create_time ?? '0')),
         edited: false,
       },
       raw: item as unknown as LarkRawMessage,
-      text: extractText(String(item['content'] ?? '')),
+      text: extractText(content),
       threadId,
     })
   }
