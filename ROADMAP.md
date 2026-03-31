@@ -5,6 +5,7 @@
 All 17 required Adapter methods implemented. 12 of 15 optional methods implemented.
 
 **Coverage:**
+
 - Messaging: post / edit / delete / stream / ephemeral
 - Rich content: cards / modals (form container) / file uploads
 - Interactions: buttons / select menus / reactions / modal submit & close
@@ -56,10 +57,10 @@ Lower priority, implement as needed.
 
 Features that don't apply to Lark:
 
-| Feature | Reason |
-|---|---|
-| `listThreads` | No Lark API to list threads in a chat |
-| `scheduleMessage` | No Lark API for scheduled delivery |
-| `processSlashCommand` | Lark has no slash command mechanism |
-| `processAppHomeOpened` | Lark has no App Home tab |
-| `processAssistant*` | Slack AI Assistant-specific |
+| Feature                | Reason                                |
+| ---------------------- | ------------------------------------- |
+| `listThreads`          | No Lark API to list threads in a chat |
+| `scheduleMessage`      | No Lark API for scheduled delivery    |
+| `processSlashCommand`  | Lark has no slash command mechanism   |
+| `processAppHomeOpened` | Lark has no App Home tab              |
+| `processAssistant*`    | Slack AI Assistant-specific           |

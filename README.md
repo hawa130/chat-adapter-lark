@@ -3,12 +3,12 @@
 [![npm version](https://img.shields.io/npm/v/chat-adapter-lark)](https://www.npmjs.com/package/chat-adapter-lark)
 [![npm downloads](https://img.shields.io/npm/dm/chat-adapter-lark)](https://www.npmjs.com/package/chat-adapter-lark)
 
-Lark (飞书) adapter for [Chat SDK](https://chat-sdk.dev). Supports both Feishu (China) and Lark (International) domains.
+Lark (飞书) adapter for [Chat SDK](https://chat-sdk.dev/docs). Supports both Feishu (China) and Lark (International) domains.
 
 ## Installation
 
 ```bash
-pnpm add chat-adapter-lark
+pnpm add chat chat-adapter-lark
 ```
 
 ## Usage
@@ -115,17 +115,20 @@ Or set `LARK_DOMAIN=lark` in your environment variables.
 
 All options are auto-detected from environment variables when not provided. You can call `createLarkAdapter()` with no arguments if the env vars are set.
 
-| Option              | Required | Description                                                                          |
-| ------------------- | -------- | ------------------------------------------------------------------------------------ |
-| `appId`             | Yes\*    | Lark App ID. Auto-detected from `LARK_APP_ID`                                        |
-| `appSecret`         | Yes\*    | Lark App Secret. Auto-detected from `LARK_APP_SECRET`                                |
-| `encryptKey`        | No       | Encrypt key for event decryption. Auto-detected from `LARK_ENCRYPT_KEY`              |
-| `verificationToken` | No       | Verification token for v1 events. Auto-detected from `LARK_VERIFICATION_TOKEN`       |
-| `domain`            | No       | `"feishu"` (default) or `"lark"` for international. Auto-detected from `LARK_DOMAIN` |
-| `userName`          | No       | Bot display name (defaults to name from API)                                         |
-| `disableTokenCache` | No       | Disable SDK token caching                                                            |
+| Option              | Type           | Default                   | Description                                             |
+| ------------------- | -------------- | ------------------------- | ------------------------------------------------------- |
+| `appId`             | `string`       | `LARK_APP_ID`             | Lark App ID                                             |
+| `appSecret`         | `string`       | `LARK_APP_SECRET`         | Lark App Secret                                         |
+| `encryptKey`        | `string`       | `LARK_ENCRYPT_KEY`        | Encrypt key for event decryption                        |
+| `verificationToken` | `string`       | `LARK_VERIFICATION_TOKEN` | Verification token for v1 events                        |
+| `domain`            | `Domain`       | `Domain.Feishu`           | API domain (`Domain.Feishu` or `Domain.Lark`)           |
+| `userName`          | `string`       | Bot name from API         | Bot display name override                               |
+| `disableTokenCache` | `boolean`      | `false`                   | Disable SDK's internal token caching                    |
+| `appType`           | `AppType`      | `AppType.SelfBuild`       | App type (`AppType.SelfBuild` or `AppType.ISV`)         |
+| `cache`             | `Cache`        | SDK default               | Custom token cache (e.g. Redis) for distributed deploys |
+| `httpInstance`      | `HttpInstance` | SDK default               | Custom HTTP client for proxy, timeout, or interceptors  |
 
-\*`appId` and `appSecret` are required — either via config or environment variables.
+`appId` and `appSecret` are required — either via config or environment variables. `Domain`, `AppType`, `Cache`, and `HttpInstance` types are re-exported from `@larksuiteoapi/node-sdk`.
 
 ## Environment variables
 

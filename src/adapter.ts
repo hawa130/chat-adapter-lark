@@ -255,8 +255,11 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       {
         appId: this.config.appId,
         appSecret: this.config.appSecret,
+        appType: this.config.appType,
+        cache: this.config.cache,
         disableTokenCache: this.config.disableTokenCache,
         domain: this.config.domain,
+        httpInstance: this.config.httpInstance,
       },
       this.logger,
     )

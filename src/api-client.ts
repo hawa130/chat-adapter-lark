@@ -70,15 +70,20 @@ class LarkApiClient {
   readonly client: Client
 
   constructor(
-    config: Pick<LarkAdapterConfig, 'appId' | 'appSecret' | 'domain' | 'disableTokenCache'>,
+    config: Pick<
+      LarkAdapterConfig,
+      'appId' | 'appSecret' | 'appType' | 'cache' | 'disableTokenCache' | 'domain' | 'httpInstance'
+    >,
     logger?: ApiLogger,
   ) {
     const base = {
       appId: config.appId,
       appSecret: config.appSecret,
-      appType: AppType.SelfBuild as const,
+      appType: config.appType ?? (AppType.SelfBuild as const),
+      cache: config.cache,
       disableTokenCache: config.disableTokenCache,
       domain: config.domain ?? Domain.Feishu,
+      httpInstance: config.httpInstance,
     }
 
     if (logger) {

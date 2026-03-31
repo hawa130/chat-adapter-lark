@@ -1,4 +1,4 @@
-import type { Domain } from '@larksuiteoapi/node-sdk'
+import type { AppType, Cache, Domain, HttpInstance } from '@larksuiteoapi/node-sdk'
 
 interface LarkThreadId {
   chatId: string
@@ -14,12 +14,18 @@ interface LarkAdapterConfig {
   encryptKey?: string
   /** Verification token for v1 events (or env LARK_VERIFICATION_TOKEN) */
   verificationToken?: string
-  /** API domain — lark.Domain.Feishu (default) or lark.Domain.Lark */
+  /** API domain — Domain.Feishu (default) or Domain.Lark for international */
   domain?: Domain | string
   /** Bot display name (defaults to name from bot info API) */
   userName?: string
   /** Disable SDK's internal token cache */
   disableTokenCache?: boolean
+  /** App type — AppType.SelfBuild (default) or AppType.ISV for marketplace apps */
+  appType?: AppType
+  /** Custom token cache (e.g. Redis) for distributed deployments */
+  cache?: Cache
+  /** Custom HTTP client instance for proxy, timeout, or interceptor support */
+  httpInstance?: HttpInstance
 }
 
 /** Raw event data from im.message.receive_v1, as delivered by the SDK's EventDispatcher. */
