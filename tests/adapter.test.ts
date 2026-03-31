@@ -19,18 +19,6 @@ const {
 
 const BASE = 'https://open.feishu.cn'
 const TOKEN_URL = `${BASE}/open-apis/auth/v3/tenant_access_token/internal`
-const SEGMENT_COUNT_CHAT_ONLY = 2
-const SEGMENT_COUNT_WITH_ROOT = 3
-const HTTP_OK = 200
-const HTTP_BAD_REQUEST = 400
-const ONCE = 1
-const ONE_MESSAGE = 1
-const FIRST_MESSAGE = 0
-const STREAM_CHUNK_COUNT = 3
-const MEMBER_COUNT_42 = 42
-const SEQ_1 = 1
-const SEQ_2 = 2
-const SEQ_3 = 3
 
 const tokenHandler = http.post(TOKEN_URL, () =>
   HttpResponse.json({ code: 0, expire: 7200, tenant_access_token: 'test-token' }),
@@ -125,7 +113,7 @@ describe('LarkAdapter', () => {
       const adapter = makeAdapter()
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       expect(threadId).toMatch(/^lark:/)
-      expect(threadId.split(':')).toHaveLength(SEGMENT_COUNT_CHAT_ONLY)
+      expect(threadId.split(':')).toHaveLength(2)
     })
 
     it('encodes chatId + rootMessageId', () => {
@@ -134,7 +122,7 @@ describe('LarkAdapter', () => {
         chatId: 'oc_chat001',
         rootMessageId: 'om_msg001',
       })
-      expect(threadId.split(':')).toHaveLength(SEGMENT_COUNT_WITH_ROOT)
+      expect(threadId.split(':')).toHaveLength(3)
     })
 
     it('decode round-trips with chatId only', () => {
@@ -185,7 +173,7 @@ describe('LarkAdapter', () => {
       const req = makeRequest(makeChallengeEvent('test-abc'))
       const res = await adapter.handleWebhook(req)
 
-      expect(res.status).toBe(HTTP_OK)
+      expect(res.status).toBe(200)
       const json = (await res.json()) as Record<string, unknown>
       expect(JSON.stringify(json)).toContain('test-abc')
     })
@@ -199,7 +187,7 @@ describe('LarkAdapter', () => {
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       })
-      expect((await adapter.handleWebhook(req)).status).toBe(HTTP_BAD_REQUEST)
+      expect((await adapter.handleWebhook(req)).status).toBe(400)
     })
 
     it('returns 200 immediately for normal events', async () => {
@@ -207,7 +195,7 @@ describe('LarkAdapter', () => {
       await initAdapter(adapter)
 
       const req = makeRequest(makeMessageEvent())
-      expect((await adapter.handleWebhook(req)).status).toBe(HTTP_OK)
+      expect((await adapter.handleWebhook(req)).status).toBe(200)
     })
 
     it('routes message event to processMessage with factory', async () => {
@@ -215,7 +203,7 @@ describe('LarkAdapter', () => {
       const mockChat = await initAdapter(adapter)
 
       await adapter.handleWebhook(makeRequest(makeMessageEvent()))
-      expect(mockChat.processMessage).toHaveBeenCalledTimes(ONCE)
+      expect(mockChat.processMessage).toHaveBeenCalledTimes(1)
 
       const call = mockChat.processMessage.mock.calls[0]!
       expect(call[0]).toBe(adapter)
@@ -251,13 +239,13 @@ describe('LarkAdapter', () => {
       }
 
       const res = await adapter.handleWebhook(makeRequest(event), options)
-      expect(res.status).toBe(HTTP_OK)
+      expect(res.status).toBe(200)
       await Promise.allSettled(promises)
       // Wait for async threadId + user resolution
       await vi.waitFor(() => {
-        expect(mockChat.processReaction).toHaveBeenCalledTimes(ONCE)
+        expect(mockChat.processReaction).toHaveBeenCalledTimes(1)
       })
-      const call = mockChat.processReaction.mock.calls[FIRST_MESSAGE]!
+      const call = mockChat.processReaction.mock.calls[0]!
       const reactionEvent = call[0] as {
         threadId: string
         messageId: string
@@ -279,10 +267,10 @@ describe('LarkAdapter', () => {
 
       const event = makeCardActionEvent('approve', 'order_123')
       const res = await adapter.handleWebhook(makeRequest(event))
-      expect(res.status).toBe(HTTP_OK)
-      expect(mockChat.processAction).toHaveBeenCalledTimes(ONCE)
+      expect(res.status).toBe(200)
+      expect(mockChat.processAction).toHaveBeenCalledTimes(1)
 
-      const call = mockChat.processAction.mock.calls[FIRST_MESSAGE]!
+      const call = mockChat.processAction.mock.calls[0]!
       const actionEvent = call[0] as {
         actionId: string
         messageId: string
@@ -305,9 +293,9 @@ describe('LarkAdapter', () => {
 
       const event = makeSelectActionEvent('priority', 'high')
       await adapter.handleWebhook(makeRequest(event))
-      expect(mockChat.processAction).toHaveBeenCalledTimes(ONCE)
+      expect(mockChat.processAction).toHaveBeenCalledTimes(1)
 
-      const call = mockChat.processAction.mock.calls[FIRST_MESSAGE]!
+      const call = mockChat.processAction.mock.calls[0]!
       const actionEvent = call[0] as { actionId: string; value: string }
       expect(actionEvent.actionId).toBe('priority')
       expect(actionEvent.value).toBe('high')
@@ -328,9 +316,9 @@ describe('LarkAdapter', () => {
 
       // processModalSubmit is called async — wait a tick
       await new Promise((r) => setTimeout(r, 0))
-      expect(mockChat.processModalSubmit).toHaveBeenCalledTimes(ONCE)
+      expect(mockChat.processModalSubmit).toHaveBeenCalledTimes(1)
 
-      const call = mockChat.processModalSubmit.mock.calls[FIRST_MESSAGE]!
+      const call = mockChat.processModalSubmit.mock.calls[0]!
       const submitEvent = call[0] as {
         callbackId: string
         privateMetadata: string
@@ -352,8 +340,8 @@ describe('LarkAdapter', () => {
       const event = makeModalResetEvent('feedback_form', true)
       await adapter.handleWebhook(makeRequest(event))
 
-      expect(mockChat.processModalClose).toHaveBeenCalledTimes(ONCE)
-      const call = mockChat.processModalClose.mock.calls[FIRST_MESSAGE]!
+      expect(mockChat.processModalClose).toHaveBeenCalledTimes(1)
+      const call = mockChat.processModalClose.mock.calls[0]!
       const closeEvent = call[0] as { callbackId: string }
       expect(closeEvent.callbackId).toBe('feedback_form')
     })
@@ -724,7 +712,7 @@ describe('LarkAdapter', () => {
       )
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       const result = await adapter.fetchMessages(threadId)
-      expect(result.messages).toHaveLength(ONE_MESSAGE)
+      expect(result.messages).toHaveLength(1)
       expect(result.nextCursor).toBe('next-tok')
     })
 
@@ -785,7 +773,7 @@ describe('LarkAdapter', () => {
       )
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       const result = await adapter.fetchMessages(threadId)
-      const msg = result.messages[FIRST_MESSAGE]!
+      const msg = result.messages[0]!
       expect(msg.author.userId).toBe('ou_user1')
       expect(msg.author.fullName).toBe('Alice')
       expect(msg.author.userName).toBe('Alice')
@@ -815,7 +803,7 @@ describe('LarkAdapter', () => {
       )
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       const result = await adapter.fetchMessages(threadId)
-      expect(result.messages[FIRST_MESSAGE]!.author.isBot).toBe('unknown')
+      expect(result.messages[0]!.author.isBot).toBe('unknown')
     })
 
     it('fetchMessages identifies app sender as bot', async () => {
@@ -840,7 +828,7 @@ describe('LarkAdapter', () => {
       )
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       const result = await adapter.fetchMessages(threadId)
-      const msg = result.messages[FIRST_MESSAGE]!
+      const msg = result.messages[0]!
       expect(msg.author.isBot).toBe(true)
       expect(msg.author.isMe).toBe(true)
     })
@@ -895,7 +883,7 @@ describe('LarkAdapter', () => {
       const info = await adapter.fetchChannelInfo('oc_chat001')
       expect(info.id).toBe('oc_chat001')
       expect(info.name).toBe('Channel X')
-      expect(info.memberCount).toBe(MEMBER_COUNT_42)
+      expect(info.memberCount).toBe(42)
       expect(info.isDM).toBe(false)
     })
   })
@@ -1012,9 +1000,9 @@ describe('LarkAdapter', () => {
       const result = await adapter.stream(threadId, makeStreamGen()())
 
       expect(result.id).toBe('om_stream1')
-      expect(streamUpdates).toHaveLength(STREAM_CHUNK_COUNT)
-      expect(streamUpdates[streamUpdates.length - ONCE]!.content).toBe('Hello World!')
-      expect(streamUpdates.map((item) => item.sequence)).toEqual([SEQ_1, SEQ_2, SEQ_3])
+      expect(streamUpdates).toHaveLength(3)
+      expect(streamUpdates[streamUpdates.length - 1]!.content).toBe('Hello World!')
+      expect(streamUpdates.map((item) => item.sequence)).toEqual([1, 2, 3])
       expect(settingsCaptured).toMatchObject({
         settings: expect.stringContaining('streaming_mode'),
       })
@@ -1073,8 +1061,8 @@ describe('LarkAdapter', () => {
         schema?: string
       }
       expect(card.schema).toBe('2.0')
-      expect(card.body?.elements?.[FIRST_MESSAGE]?.tag).toBe('markdown')
-      expect(card.body?.elements?.[FIRST_MESSAGE]?.content).toBe('secret msg')
+      expect(card.body?.elements?.[0]?.tag).toBe('markdown')
+      expect(card.body?.elements?.[0]?.content).toBe('secret msg')
       expect(result.usedFallback).toBe(false)
     })
 
@@ -1145,8 +1133,8 @@ describe('LarkAdapter', () => {
       )
 
       const result = await adapter.fetchChannelMessages('oc_chat001')
-      expect(result.messages).toHaveLength(ONE_MESSAGE)
-      expect(result.messages.at(FIRST_MESSAGE)!.text).toBe('ch msg')
+      expect(result.messages).toHaveLength(1)
+      expect(result.messages.at(0)!.text).toBe('ch msg')
       expect(result.nextCursor).toBe('next')
     })
 
