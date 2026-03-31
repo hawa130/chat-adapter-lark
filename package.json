@@ -1,12 +1,23 @@
 {
   "name": "chat-adapter-lark",
   "version": "0.1.0",
+  "description": "Lark (飞书) adapter for Chat SDK",
   "keywords": [
     "chat-adapter",
     "chat-sdk",
     "feishu",
     "lark"
   ],
+  "homepage": "https://github.com/hawa130/chat-sdk-lark#readme",
+  "bugs": {
+    "url": "https://github.com/hawa130/chat-sdk-lark/issues"
+  },
+  "license": "MIT",
+  "author": "hawa130",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hawa130/chat-sdk-lark.git"
+  },
   "files": [
     "dist"
   ],

@@ -1,54 +1,38 @@
 # chat-adapter-lark
 
-A [Chat SDK](https://github.com/chat-sdk/chat) adapter for Lark (飞书).
+[![npm version](https://img.shields.io/npm/v/chat-adapter-lark)](https://www.npmjs.com/package/chat-adapter-lark)
+[![npm downloads](https://img.shields.io/npm/dm/chat-adapter-lark)](https://www.npmjs.com/package/chat-adapter-lark)
 
-[![npm](https://img.shields.io/npm/v/chat-adapter-lark)](https://www.npmjs.com/package/chat-adapter-lark)
-[![license](https://img.shields.io/npm/l/chat-adapter-lark)](./LICENSE)
+Lark (飞书) adapter for [Chat SDK](https://chat-sdk.dev). Supports both Feishu (China) and Lark (International) domains.
 
 ## Installation
 
 ```bash
-npm install chat-adapter-lark
-# or
-bun add chat-adapter-lark
+pnpm add chat-adapter-lark
 ```
 
-## Quick Start
+## Usage
+
+The adapter auto-detects `LARK_APP_ID` and `LARK_APP_SECRET` from environment variables:
 
 ```typescript
 import { Chat } from 'chat'
 import { createLarkAdapter } from 'chat-adapter-lark'
 
-const lark = createLarkAdapter({
-  appId: process.env.LARK_APP_ID,
-  appSecret: process.env.LARK_APP_SECRET,
+const bot = new Chat({
+  adapters: {
+    lark: createLarkAdapter(),
+  },
 })
 
-const bot = new Chat({
-  adapters: { lark },
-  onMention: async ({ thread, message }) => {
-    await thread.post(`You said: ${message.text}`)
-  },
+bot.onNewMention(async (thread, message) => {
+  await thread.post(`You said: ${message.text}`)
 })
 ```
 
-## Configuration
+## Webhook setup
 
-| Parameter           | Env Variable              | Required | Default           | Description                        |
-| ------------------- | ------------------------- | -------- | ----------------- | ---------------------------------- |
-| `appId`             | `LARK_APP_ID`             | ✅       | —                 | Lark App ID                        |
-| `appSecret`         | `LARK_APP_SECRET`         | ✅       | —                 | Lark App Secret                    |
-| `encryptKey`        | `LARK_ENCRYPT_KEY`        | —        | —                 | Encrypt key for event decryption   |
-| `verificationToken` | `LARK_VERIFICATION_TOKEN` | —        | —                 | Verification token (v1 events)     |
-| `domain`            | `LARK_DOMAIN`             | —        | `feishu`          | `feishu` or `lark` (international) |
-| `userName`          | —                         | —        | Bot name from API | Bot display name                   |
-| `disableTokenCache` | —                         | —        | `false`           | Disable token caching              |
-
-All required fields can be supplied via config object or environment variables. If both are provided, the config object takes precedence.
-
-## Webhook Setup
-
-Point your Lark event subscription URL to your deployed endpoint, then wire it up with your framework of choice:
+Point your Lark event subscription URL to your deployed endpoint:
 
 **Next.js App Router:**
 
@@ -74,62 +58,148 @@ app.post('/webhook/lark', async (req, res) => {
 })
 ```
 
-## Lark Open Platform Setup
+## Lark app setup
 
-1. Create a Custom App at [open.feishu.cn](https://open.feishu.cn) (or [open.larksuite.com](https://open.larksuite.com) for international)
-2. Add the **Bot** capability under Features
-3. Configure the event subscription URL to point to your webhook endpoint
-4. Add the required permissions listed below
-5. URL verification is handled automatically — no extra setup needed
-6. Publish the app to make it available in your workspace
+### 1. Create application
 
-## Required Permissions
+1. Go to [open.feishu.cn](https://open.feishu.cn) (or [open.larksuite.com](https://open.larksuite.com) for international)
+2. Create a **Custom App**
+3. Add the **Bot** capability under Features
 
-| Permission                 | Description             |
-| -------------------------- | ----------------------- |
-| `im:message`               | Read messages           |
-| `im:message:send_as_bot`   | Send messages as bot    |
-| `im:chat:readonly`         | Read chat info          |
-| `im:resource`              | Access files and images |
-| `contact:user.id:readonly` | Read user IDs           |
+### 2. Configure events
 
-## Feature Support
+1. Set the event subscription URL to your webhook endpoint
+2. URL verification is handled automatically — no extra setup needed
+3. Subscribe to the following events:
+   - `im.message.receive_v1` — Receive messages
+   - `im.message.reaction.created_v1` — Reaction added
+   - `im.message.reaction.deleted_v1` — Reaction removed
 
-| Feature                     | Status                    |
-| --------------------------- | ------------------------- |
-| Text messages               | ✅                        |
-| Rich text (post)            | ✅                        |
-| Interactive cards           | ✅                        |
-| File/Image upload           | ✅                        |
-| Reactions                   | ✅                        |
-| Streaming (via editMessage) | ✅                        |
-| Ephemeral messages          | ⚠️ Interactive cards only |
-| Thread replies              | ✅                        |
-| DM                          | ✅                        |
-| Typing indicator            | ❌ No Lark API            |
-| Modals                      | ❌ Not supported          |
+### 3. Add permissions
+
+Add the following scopes to your app:
+
+| Permission                         | Description                            |
+| ---------------------------------- | -------------------------------------- |
+| `im:message`                       | Read, send, edit, and delete messages  |
+| `im:message.group_at_msg:readonly` | Receive @bot messages in group chats   |
+| `im:message.p2p_msg:readonly`      | Receive direct messages                |
+| `im:message.reactions:read`        | Receive reaction events                |
+| `im:chat:readonly`                 | Read chat info                         |
+| `im:chat:create`                   | Create DM conversations (for `openDM`) |
+| `im:resource`                      | Upload and download images and files   |
+| `contact:user.id:readonly`         | Read user IDs                          |
+
+### 4. Publish
+
+Publish the app to make it available in your workspace.
 
 ## Feishu vs Lark
 
-The `domain` option controls which Lark API endpoint is used. Use `feishu` for mainland China and `lark` for international.
+The `domain` option controls which API endpoint is used. Use `"feishu"` for mainland China and `"lark"` for international:
 
 ```typescript
 import { Domain } from '@larksuiteoapi/node-sdk'
 
-// International (Lark)
-createLarkAdapter({ domain: Domain.Lark })
-// or via env
-// LARK_DOMAIN=lark
-
 // China (Feishu, default)
 createLarkAdapter({ domain: Domain.Feishu })
-// or via env
-// LARK_DOMAIN=feishu
+
+// International (Lark)
+createLarkAdapter({ domain: Domain.Lark })
 ```
+
+Or set `LARK_DOMAIN=lark` in your environment variables.
+
+## Configuration
+
+All options are auto-detected from environment variables when not provided. You can call `createLarkAdapter()` with no arguments if the env vars are set.
+
+| Option              | Required | Description                                                                          |
+| ------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `appId`             | Yes\*    | Lark App ID. Auto-detected from `LARK_APP_ID`                                        |
+| `appSecret`         | Yes\*    | Lark App Secret. Auto-detected from `LARK_APP_SECRET`                                |
+| `encryptKey`        | No       | Encrypt key for event decryption. Auto-detected from `LARK_ENCRYPT_KEY`              |
+| `verificationToken` | No       | Verification token for v1 events. Auto-detected from `LARK_VERIFICATION_TOKEN`       |
+| `domain`            | No       | `"feishu"` (default) or `"lark"` for international. Auto-detected from `LARK_DOMAIN` |
+| `userName`          | No       | Bot display name (defaults to name from API)                                         |
+| `disableTokenCache` | No       | Disable SDK token caching                                                            |
+
+\*`appId` and `appSecret` are required — either via config or environment variables.
+
+## Environment variables
+
+```bash
+LARK_APP_ID=cli_xxxx
+LARK_APP_SECRET=xxxx
+LARK_ENCRYPT_KEY=xxxx            # Optional, for event decryption
+LARK_VERIFICATION_TOKEN=xxxx     # Optional, for v1 event verification
+LARK_DOMAIN=feishu               # Optional, "feishu" (default) or "lark"
+```
+
+## Features
+
+### Messaging
+
+| Feature        | Supported      |
+| -------------- | -------------- |
+| Post message   | Yes            |
+| Edit message   | Yes            |
+| Delete message | Yes            |
+| File uploads   | Yes            |
+| Streaming      | Card streaming |
+
+### Rich content
+
+| Feature         | Supported         |
+| --------------- | ----------------- |
+| Card format     | Interactive Cards |
+| Buttons         | Yes               |
+| Link buttons    | Yes               |
+| Select menus    | Yes               |
+| Tables          | Yes               |
+| Fields          | Yes               |
+| Images in cards | Yes               |
+| Modals          | No                |
+
+### Conversations
+
+| Feature            | Supported              |
+| ------------------ | ---------------------- |
+| Mentions           | Yes                    |
+| Add reactions      | Yes                    |
+| Remove reactions   | Yes                    |
+| Typing indicator   | No                     |
+| DMs                | Yes                    |
+| Ephemeral messages | Interactive cards only |
+
+### Message history
+
+| Feature                | Supported |
+| ---------------------- | --------- |
+| Fetch messages         | Yes       |
+| Fetch single message   | Yes       |
+| Fetch thread info      | Yes       |
+| Fetch channel messages | No        |
+| List threads           | No        |
+| Fetch channel info     | Yes       |
+| Post channel message   | No        |
+
+## Troubleshooting
+
+### Bot not responding to messages
+
+1. Verify the event subscription URL is correct and accessible
+2. Check that the bot has been added to the group
+3. Ensure required permissions are granted and the app is published
+
+### Events received but not processed
+
+1. Check `encryptKey` if event encryption is enabled in the Lark console
+2. Verify `verificationToken` for v1 event format
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request. Make sure `bun run lint` and `bun run fmt:check` pass before opening a PR.
+Contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request.
 
 ## License
 
