@@ -42,7 +42,7 @@ The Lark adapter works correctly but diverges from official adapter patterns in 
   - `extractEventId` helper function
   - The dedup check in `handleEvent()` (`if (eventId && this.dedup.has(eventId))` block)
   - `this.dedup.clear()` in `disconnect()`
-- `disconnect()` becomes empty or removed
+- `disconnect()`: clear the local `channelTypeMap` and return. Keep the method for hygiene.
 - Update adapter tests that verify dedup behavior — remove or convert to verify events are forwarded
 
 ### 3. User Info Cache (lookupUser)
@@ -61,15 +61,16 @@ The Lark adapter works correctly but diverges from official adapter patterns in 
 
 **New API method** in `LarkApiClient`:
 ```typescript
-async getUser(openId: string): Promise<{ name?: string }> {
+async getUser(openId: string) {
   return this.call(() =>
     this.client.contact.user.get({
       path: { user_id: openId },
       params: { user_id_type: 'open_id' },
     }),
-  ) as Promise<{ data?: { user?: { name?: string } } }>
+  )
 }
 ```
+Returns the full SDK response (like all other `LarkApiClient` methods). The caller accesses `.data?.user?.name`.
 
 **New private method** in `LarkAdapter`:
 ```typescript
@@ -91,10 +92,13 @@ private async lookupUser(openId: string): Promise<string> {
 }
 ```
 
+**Cache type note:** The stored `{ name: string }` always contains a resolved string — either the real display name from the API, or the `openId` as fallback. Never `undefined`.
+
 **Message handling change:**
-- `handleMessageEvent` switches from passing a `Message` directly to passing a factory `async () => Promise<Message>` (already supported by `chat.processMessage`)
-- The factory calls `lookupUser(sender.open_id)` to resolve the author name
-- Same pattern for `handleReactionEvent` — resolve user name before building the reaction event
+- `handleMessageEvent` extracts `threadId` synchronously from `data.message.chat_id` / `data.message.root_id` (just `encodeThreadId`), then passes an `async () => Promise<Message>` factory to `chat.processMessage`
+- The factory calls `lookupUser(sender.open_id)` to resolve the author name, then calls `parseMessage` and overrides `Author.fullName` / `Author.userName` with the resolved name
+- `buildAuthor()` helper remains unchanged — the factory overrides its output after calling `parseMessage`
+- `handleReactionEvent`: call `lookupUser` within the existing async chain (inside the `.then()` after `resolveReactionThreadId`), use the result to populate `user.fullName` and `user.userName` instead of the current empty strings
 
 **Scope boundary:** Only cache `name`. Do not build reverse indexes or thread participant tracking — Lark's mention system uses `open_id`, not display names, so outgoing mention resolution is not needed.
 
@@ -146,7 +150,21 @@ isDM() → check local map (sync) → if miss, return false (conservative)
 getChannelVisibility() → check local map (sync) → if miss, return 'unknown'
 ```
 
-This gives serverless durability (state adapter) while keeping `isDM()` synchronous. On cold start, the first message from each chat populates the map. `fetchThread()` and `fetchChannelInfo()` also populate the cache as a side effect.
+This gives serverless durability (state adapter) while keeping `isDM()` synchronous.
+
+**Cold start limitation (accepted):** `isDM()` may return `false` on cold start before the first message arrives from that chat. This is identical to current behavior and acceptable because Chat SDK uses `fetchThread()` / `fetchChannelInfo()` for authoritative DM detection — `isDM()` is a fast hint, not the source of truth.
+
+**Write-through in fetch methods:** `fetchThread()` and `fetchChannelInfo()` must also populate both the local map and the state adapter cache as a side effect:
+```typescript
+// In fetchThread():
+const chatType = res.data?.chat_type
+if (chatType) {
+  this.channelTypeMap.set(chatId, chatType)
+  void state.set(`lark:channel:${chatId}`, { name: res.data?.name, chatType }, CHANNEL_CACHE_TTL_MS)
+}
+
+// Same pattern in fetchChannelInfo()
+```
 
 ### 5. Permissions
 
