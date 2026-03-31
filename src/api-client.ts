@@ -119,6 +119,15 @@ class LarkApiClient {
     )
   }
 
+  async patchCard(messageId: string, content: string) {
+    return this.call(() =>
+      this.client.im.message.patch({
+        data: { content },
+        path: { message_id: messageId },
+      }),
+    )
+  }
+
   async deleteMessage(messageId: string) {
     return this.call(() => this.client.im.message.delete({ path: { message_id: messageId } }))
   }
@@ -127,7 +136,12 @@ class LarkApiClient {
     return this.call(() => this.client.im.message.get({ path: { message_id: messageId } }))
   }
 
-  async listMessages(chatId: string, pageToken?: string, pageSize?: number) {
+  async listMessages(
+    chatId: string,
+    pageToken?: string,
+    pageSize?: number,
+    sortType?: 'ByCreateTimeAsc' | 'ByCreateTimeDesc',
+  ) {
     return this.call(() =>
       this.client.im.message.list({
         params: {
@@ -135,6 +149,7 @@ class LarkApiClient {
           container_id_type: 'chat',
           page_size: pageSize ?? DEFAULT_PAGE_SIZE,
           page_token: pageToken,
+          sort_type: sortType,
         },
       }),
     )
@@ -197,10 +212,10 @@ class LarkApiClient {
     return res as { bot?: { app_name?: string; open_id?: string } }
   }
 
-  async sendEphemeral(chatId: string, userId: string, content: string) {
+  async sendEphemeral(chatId: string, userId: string, card: unknown) {
     return this.call(() =>
       this.client.request({
-        data: { card: content, chat_id: chatId, msg_type: 'interactive', open_id: userId },
+        data: { card, chat_id: chatId, msg_type: 'interactive', open_id: userId },
         method: 'POST',
         url: '/open-apis/ephemeral/v1/send',
       }),

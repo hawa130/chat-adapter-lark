@@ -214,6 +214,17 @@ describe('LarkAdapter', () => {
       const adapter = makeAdapter()
       const mockChat = await initAdapter(adapter)
 
+      server.use(
+        http.get(`${BASE}/open-apis/im/v1/messages/:message_id`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              items: [{ chat_id: 'oc_chat001', message_id: 'om_msg001', root_id: '' }],
+            },
+          }),
+        ),
+      )
+
       const event = makeReactionEvent('created')
       const promises: Array<Promise<unknown>> = []
       const options = {
@@ -225,7 +236,10 @@ describe('LarkAdapter', () => {
       const res = await adapter.handleWebhook(makeRequest(event), options)
       expect(res.status).toBe(HTTP_OK)
       await Promise.allSettled(promises)
-      expect(mockChat.processReaction).toHaveBeenCalledTimes(ONCE)
+      // Wait for async threadId resolution
+      await vi.waitFor(() => {
+        expect(mockChat.processReaction).toHaveBeenCalledTimes(ONCE)
+      })
     })
   })
 
