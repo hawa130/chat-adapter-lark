@@ -1,4 +1,4 @@
-export default class DedupCache {
+export class DedupCache {
   private readonly capacity: number
   private readonly set = new Set<string>()
   private readonly queue: string[] = []

@@ -1,7 +1,7 @@
 import { HttpResponse, http } from 'msw'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import LarkApiClient from '../src/api-client.ts'
-import server from './setup.ts'
+import { LarkApiClient } from '../src/api-client.ts'
+import { server } from './setup.ts'
 
 const BASE = 'https://open.feishu.cn'
 const TOKEN_URL = `${BASE}/open-apis/auth/v3/tenant_access_token/internal`

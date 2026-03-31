@@ -313,4 +313,4 @@ const cardToFallbackText = (card: CardChild): string => {
 
 const cardMapper = { cardToFallbackText, cardToLarkInteractive }
 
-export default cardMapper
+export { cardMapper }

@@ -247,4 +247,4 @@ class LarkApiClient {
   }
 }
 
-export default LarkApiClient
+export { LarkApiClient }

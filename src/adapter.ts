@@ -33,11 +33,11 @@ import { ValidationError, extractCard, extractFiles, toBuffer } from '@chat-adap
 import type { EventHandles } from '@larksuiteoapi/node-sdk'
 import { EventDispatcher } from '@larksuiteoapi/node-sdk'
 import { Message } from 'chat'
-import DedupCache from './dedup-cache.ts'
-import LarkApiClient from './api-client.ts'
-import LarkFormatConverter from './format-converter.ts'
-import bridgeWebhook from './event-bridge.ts'
-import cardMapper from './card-mapper.ts'
+import { DedupCache } from './dedup-cache.ts'
+import { LarkApiClient } from './api-client.ts'
+import { LarkFormatConverter } from './format-converter.ts'
+import { bridgeWebhook } from './event-bridge.ts'
+import { cardMapper } from './card-mapper.ts'
 
 /** Extract the first parameter type of an event handler from the SDK's EventHandles. */
 type EventData<TKey extends keyof EventHandles> =
@@ -187,7 +187,7 @@ const parseMemberCount = (
   return undefined
 }
 
-export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
+export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   readonly name = ADAPTER_NAME
   botUserId = ''
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import cardMapper from '../src/card-mapper.ts'
+import { cardMapper } from '../src/card-mapper.ts'
 import type {
   CardChild,
   LarkButtonElement,

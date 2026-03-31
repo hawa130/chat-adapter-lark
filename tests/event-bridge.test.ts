@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EventDispatcher } from '@larksuiteoapi/node-sdk'
-import bridgeWebhook from '../src/event-bridge.ts'
-import fixtures from './fixtures.ts'
+import { bridgeWebhook } from '../src/event-bridge.ts'
+import { fixtures } from './fixtures.ts'
 
 const { makeChallengeEvent, makeMessageEvent, makeRequest } = fixtures
 

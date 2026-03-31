@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import DedupCache from '../src/dedup-cache.ts'
+import { DedupCache } from '../src/dedup-cache.ts'
 
 const LARGE_CAPACITY = 100
 const SMALL_CAPACITY = 3

@@ -2,9 +2,9 @@ import type { ActionEvent, Message, ReactionEvent, Thread } from 'chat'
 import { Chat } from 'chat'
 import { createMemoryState } from '@chat-adapter/state-memory'
 import { HttpResponse, http } from 'msw'
-import createLarkAdapter from '../src/factory.ts'
-import fixtures from './fixtures.ts'
-import server from './setup.ts'
+import { createLarkAdapter } from '../src/factory.ts'
+import { fixtures } from './fixtures.ts'
+import { server } from './setup.ts'
 
 const { makeRequest } = fixtures
 
@@ -136,4 +136,4 @@ const createLarkTestContext = (handlers: TestContextHandlers = {}) => {
   }
 }
 
-export default createLarkTestContext
+export { createLarkTestContext }

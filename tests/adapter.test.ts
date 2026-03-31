@@ -1,9 +1,9 @@
 import { HttpResponse, http } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import LarkAdapter from '../src/adapter.ts'
+import { LarkAdapter } from '../src/adapter.ts'
 import type { LarkRawMessage } from '../src/types.ts'
-import fixtures from './fixtures.ts'
-import server from './setup.ts'
+import { fixtures } from './fixtures.ts'
+import { server } from './setup.ts'
 
 const { makeChallengeEvent, makeMessageEvent, makeReactionEvent, makeRequest } = fixtures
 

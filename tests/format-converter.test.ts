@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import LarkFormatConverter from '../src/format-converter.ts'
+import { LarkFormatConverter } from '../src/format-converter.ts'
 
 type AstNode = { children?: unknown[]; type: string; value?: string }
 

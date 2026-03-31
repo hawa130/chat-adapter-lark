@@ -6,7 +6,7 @@ import type {
   LarkMessageContent,
   LarkPostContent,
 } from './types.ts'
-import cardMapper from './card-mapper.ts'
+import { cardMapper } from './card-mapper.ts'
 
 type PostLang = { content?: PostInlineTag[][]; title?: string }
 type PostInlineTag =
@@ -90,7 +90,7 @@ const parsePlatformText = (platformText: string): string => {
   return platformText
 }
 
-export default class LarkFormatConverter extends BaseFormatConverter {
+export class LarkFormatConverter extends BaseFormatConverter {
   toAst(platformText: string): Root {
     return parseMarkdown(parsePlatformText(platformText))
   }

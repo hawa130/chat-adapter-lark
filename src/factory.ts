@@ -1,5 +1,5 @@
 import { Domain } from '@larksuiteoapi/node-sdk'
-import LarkAdapter from './adapter.ts'
+import { LarkAdapter } from './adapter.ts'
 import type { LarkAdapterConfig } from './types.ts'
 import { ValidationError } from '@chat-adapter/shared'
 
@@ -42,4 +42,4 @@ const resolveConfig = (config?: Partial<LarkAdapterConfig>): LarkAdapterConfig =
 const createLarkAdapter = (config?: Partial<LarkAdapterConfig>): LarkAdapter =>
   new LarkAdapter(resolveConfig(config))
 
-export default createLarkAdapter
+export { createLarkAdapter }

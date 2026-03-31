@@ -98,4 +98,4 @@ const fixtures = {
   makeRequest,
 }
 
-export default fixtures
+export { fixtures }

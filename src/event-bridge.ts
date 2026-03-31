@@ -30,4 +30,4 @@ const bridgeWebhook = async (request: Request, dispatcher: EventDispatcher): Pro
   return dispatcher.invoke(assigned)
 }
 
-export default bridgeWebhook
+export { bridgeWebhook }

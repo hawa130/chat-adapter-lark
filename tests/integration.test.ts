@@ -6,9 +6,9 @@
  */
 import { HttpResponse, http } from 'msw'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import fixtures from './fixtures.ts'
-import server from './setup.ts'
-import createLarkTestContext from './test-utils.ts'
+import { fixtures } from './fixtures.ts'
+import { server } from './setup.ts'
+import { createLarkTestContext } from './test-utils.ts'
 
 const { makeDMEvent, makeMessageEvent } = fixtures
 
