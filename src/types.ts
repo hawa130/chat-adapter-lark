@@ -1,4 +1,5 @@
 import type { AppType, Cache, Domain, HttpInstance } from '@larksuiteoapi/node-sdk'
+import type { Logger } from 'chat'
 
 interface LarkThreadId {
   chatId: string
@@ -20,6 +21,8 @@ interface LarkAdapterConfig {
   userName?: string
   /** Disable SDK's internal token cache */
   disableTokenCache?: boolean
+  /** Custom logger instance (defaults to ConsoleLogger) */
+  logger?: Logger
   /** App type — AppType.SelfBuild (default) or AppType.ISV for marketplace apps */
   appType?: AppType
   /** Custom token cache (e.g. Redis) for distributed deployments */

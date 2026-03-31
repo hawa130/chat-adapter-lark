@@ -53,12 +53,6 @@ const makeAdapter = () =>
   })
 
 const makeMockChat = () => ({
-  getLogger: () => ({
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-  }),
   getState: vi.fn(),
   getUserName: () => 'TestBot',
   handleIncomingMessage: vi.fn(),

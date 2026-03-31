@@ -39,6 +39,7 @@ const resolveConfig = (config?: Partial<LarkAdapterConfig>): LarkAdapterConfig =
     ...(config?.appType !== undefined && { appType: config.appType }),
     ...(config?.cache !== undefined && { cache: config.cache }),
     ...(config?.httpInstance !== undefined && { httpInstance: config.httpInstance }),
+    ...(config?.logger !== undefined && { logger: config.logger }),
   }
 }
 

@@ -124,6 +124,7 @@ All options are auto-detected from environment variables when not provided. You 
 | `domain`            | `Domain`       | `Domain.Feishu`           | API domain (`Domain.Feishu` or `Domain.Lark`)           |
 | `userName`          | `string`       | Bot name from API         | Bot display name override                               |
 | `disableTokenCache` | `boolean`      | `false`                   | Disable SDK's internal token caching                    |
+| `logger`            | `Logger`       | `ConsoleLogger`           | Custom logger instance (from `chat` package)            |
 | `appType`           | `AppType`      | `AppType.SelfBuild`       | App type (`AppType.SelfBuild` or `AppType.ISV`)         |
 | `cache`             | `Cache`        | SDK default               | Custom token cache (e.g. Redis) for distributed deploys |
 | `httpInstance`      | `HttpInstance` | SDK default               | Custom HTTP client for proxy, timeout, or interceptors  |

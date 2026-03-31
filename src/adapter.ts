@@ -35,7 +35,7 @@ import type { PlatformName } from '@chat-adapter/shared'
 import { ValidationError, extractCard, extractFiles, toBuffer } from '@chat-adapter/shared'
 import type { EventHandles } from '@larksuiteoapi/node-sdk'
 import { EventDispatcher } from '@larksuiteoapi/node-sdk'
-import { Message } from 'chat'
+import { ConsoleLogger, Message } from 'chat'
 import { DedupCache } from './dedup-cache.ts'
 import { LarkApiClient } from './api-client.ts'
 import { LarkFormatConverter } from './format-converter.ts'
@@ -223,7 +223,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   botUserId = ''
 
   private chat!: ChatInstance
-  private logger!: Logger
+  private readonly logger: Logger
   private botOpenId = ''
   private resolvedUserName: string
   private readonly config: LarkAdapterConfig
@@ -240,6 +240,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   constructor(config: LarkAdapterConfig) {
     this.config = config
+    this.logger = config.logger ?? new ConsoleLogger('info').child('lark')
     this.resolvedUserName = config.userName ?? 'LarkBot'
     this.dispatcher = new EventDispatcher({
       encryptKey: config.encryptKey,
@@ -250,7 +251,6 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   async initialize(chat: ChatInstance): Promise<void> {
     this.chat = chat
-    this.logger = chat.getLogger(ADAPTER_NAME)
     this.api = new LarkApiClient(
       {
         appId: this.config.appId,
@@ -606,7 +606,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   private registerEventHandlers(): void {
     this.dispatcher.register({
       'im.chat.member.bot.added_v1': (data) => {
-        this.logger?.info?.('Bot added to chat', data)
+        this.logger.info('Bot added to chat', data)
       },
       'im.message.reaction.created_v1': (data) => {
         this.handleReactionEvent(data, true)
@@ -672,7 +672,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         return this.encodeThreadId({ chatId, rootMessageId: item?.root_id || undefined })
       }
     } catch {
-      this.logger?.warn?.('Failed to resolve threadId for reaction', { messageId })
+      this.logger.warn('Failed to resolve threadId for reaction', { messageId })
     }
     return ''
   }
@@ -766,7 +766,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         return undefined
       })
       .catch((err: unknown) => {
-        this.logger?.error?.('Modal submit processing error', err)
+        this.logger.error('Modal submit processing error', err)
       })
   }
 
@@ -844,7 +844,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         .join('\n')
       const content = JSON.stringify({ text: `\u26a0\ufe0f Validation errors:\n${errorText}` })
       void this.api.replyMessage(messageId, 'text', content).catch((err: unknown) => {
-        this.logger?.error?.('Failed to send validation errors', err)
+        this.logger.error('Failed to send validation errors', err)
       })
       return
     }
@@ -853,11 +853,11 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       const cardJson = modalMapper.modalToLarkCard(response.modal as ModalInput, contextId)
       if (response.action === 'update') {
         void this.api.patchCard(messageId, JSON.stringify(cardJson)).catch((err: unknown) => {
-          this.logger?.error?.('Failed to update modal card', err)
+          this.logger.error('Failed to update modal card', err)
         })
       } else {
         void this.sendCardMessage({ chatId }, cardJson).catch((err: unknown) => {
-          this.logger?.error?.('Failed to push modal card', err)
+          this.logger.error('Failed to push modal card', err)
         })
       }
     }
@@ -867,7 +867,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     this.pendingWebhookOptions = options
     void (this.dispatcher.invoke(body as Record<string, unknown>) as Promise<unknown>)
       .catch((err: unknown) => {
-        this.logger?.error?.('Event processing error', err)
+        this.logger.error('Event processing error', err)
       })
       .finally(() => {
         this.pendingWebhookOptions = undefined
@@ -932,7 +932,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         node[field] = key
       }
     } catch {
-      this.logger?.warn?.('Failed to upload card image', { field, url })
+      this.logger.warn('Failed to upload card image', { field, url })
     }
   }
 
