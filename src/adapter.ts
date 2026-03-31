@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Readable } from 'node:stream'
 import type {
   Adapter,
@@ -243,7 +242,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   private readonly dispatcher: EventDispatcher
   private readonly channelTypeMap = new Map<string, string>()
   private readonly userNameCache = new Map<string, string>()
-  private readonly webhookContext = new AsyncLocalStorage<WebhookOptions | undefined>()
+  private pendingWebhookOptions?: WebhookOptions
 
   get userName(): string {
     return this.resolvedUserName
@@ -748,7 +747,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       return
     }
     const msg = data.message
-    const options = this.webhookContext.getStore()
+    const options = this.pendingWebhookOptions
     const threadId = this.encodeThreadId({
       chatId: msg.chat_id,
       rootMessageId: msg.root_id || undefined,
@@ -794,7 +793,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     if (!data?.message_id) {
       return
     }
-    const options = this.webhookContext.getStore()
+    const options = this.pendingWebhookOptions
     const emojiType = data.reaction_type?.emoji_type ?? ''
     const messageId = data.message_id
     const userId = data.user_id?.open_id ?? ''
@@ -1019,13 +1018,14 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   }
 
   private dispatchEvent(body: LarkWebhookBody, options?: WebhookOptions): void {
-    this.webhookContext.run(options, () => {
-      void (this.dispatcher.invoke(body as Record<string, unknown>) as Promise<unknown>).catch(
-        (err: unknown) => {
-          this.logger.error('Event processing error', err)
-        },
-      )
-    })
+    this.pendingWebhookOptions = options
+    void (this.dispatcher.invoke(body as Record<string, unknown>) as Promise<unknown>)
+      .catch((err: unknown) => {
+        this.logger.error('Event processing error', err)
+      })
+      .finally(() => {
+        this.pendingWebhookOptions = undefined
+      })
   }
 
   private extractImageKey(uploadRes: { image_key?: string } | null): string {
