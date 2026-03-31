@@ -1,4 +1,3 @@
-import { customAlphabet } from 'nanoid'
 import type {
   CardChild,
   LarkBehavior,
@@ -14,14 +13,56 @@ import type {
   LarkTableElement,
 } from './types.ts'
 
-const NANO_ID_SIZE = 12
+const ID_SIZE = 12
 const MIN_PAGE_SIZE = 1
 const MAX_PAGE_SIZE = 10
 
-const generateId = customAlphabet(
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-  NANO_ID_SIZE,
-)
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+
+/* eslint-disable no-magic-numbers -- bit math for nanoid-style ID generation */
+const POOL_SIZE_MULTIPLIER = 128
+const MASK = (2 << (31 - Math.clz32((ALPHABET.length - 1) | 1))) - 1
+const STEP = Math.ceil((1.6 * MASK * ID_SIZE) / ALPHABET.length)
+/* eslint-enable no-magic-numbers */
+
+/* eslint-disable no-magic-numbers -- nanoid-style random byte pool implementation */
+
+// Pre-allocated random byte pool to amortize crypto.getRandomValues calls
+let pool: Uint8Array | undefined = undefined
+let poolOffset = 0
+
+const fillPool = (bytes: number): void => {
+  if (!pool || pool.length < bytes) {
+    pool = new Uint8Array(bytes * POOL_SIZE_MULTIPLIER)
+    globalThis.crypto.getRandomValues(pool)
+    poolOffset = 0
+  } else if (poolOffset + bytes > pool.length) {
+    globalThis.crypto.getRandomValues(pool)
+    poolOffset = 0
+  }
+  poolOffset += bytes
+}
+
+const randomPool = (bytes: number): Uint8Array => {
+  fillPool(bytes)
+  return pool!.subarray(poolOffset - bytes, poolOffset)
+}
+
+const generateId = (size: number = ID_SIZE): string => {
+  let id = ''
+  // eslint-disable-next-line no-constant-condition -- intentional rejection-sampling loop
+  while (true) {
+    const bytes = randomPool(STEP)
+    for (let idx = STEP - 1; idx >= 0; idx--) {
+      id += ALPHABET[bytes[idx]! & MASK] || ''
+      if (id.length >= size) {
+        return id
+      }
+    }
+  }
+}
+
+/* eslint-enable no-magic-numbers */
 
 const nextElementId = (): string => `el_${generateId()}`
 

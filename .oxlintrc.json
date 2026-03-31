@@ -39,6 +39,7 @@
     "typescript/no-explicit-any": "error",
     "typescript/no-import-type-side-effects": "error",
     "typescript/non-nullable-type-assertion-style": "error",
+    "import/no-nodejs-modules": "off",
 
     // style: import 相关
     "no-duplicate-imports": ["warn", { "allowSeparateTypeImports": true }],
