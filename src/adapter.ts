@@ -11,6 +11,8 @@ import type {
   FileUpload,
   FormattedContent,
   Logger,
+  ModalElement,
+  ModalResponse,
   RawMessage,
   StreamChunk,
   StreamOptions,
@@ -39,6 +41,8 @@ import { LarkApiClient } from './api-client.ts'
 import { LarkFormatConverter } from './format-converter.ts'
 import { bridgeWebhook } from './event-bridge.ts'
 import { cardMapper } from './card-mapper.ts'
+import type { ModalInput } from './modal-mapper.ts'
+import { modalMapper } from './modal-mapper.ts'
 
 /** Extract the first parameter type of an event handler from the SDK's EventHandles. */
 type EventData<TKey extends keyof EventHandles> =
@@ -48,6 +52,7 @@ type EventData<TKey extends keyof EventHandles> =
 
 const ADAPTER_NAME = 'lark'
 const CARD_ACTION_EVENT_TYPE = 'card.action.trigger'
+const MODAL_MARKER = '1'
 const DEDUP_CAPACITY = 500
 const STREAM_ELEMENT_ID = 'stream_md'
 const INITIAL_SEQUENCE = 1
@@ -502,6 +507,24 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.converter.fromAst(content)
   }
 
+  // -- Modals --
+
+  async openModal(
+    triggerId: string,
+    modal: ModalElement,
+    contextId?: string,
+  ): Promise<{ viewId: string }> {
+    const [chatId] = triggerId.split(':')
+    if (!chatId) {
+      throw new ValidationError(ADAPTER_NAME, 'Invalid triggerId: missing chatId')
+    }
+    const cardJson = modalMapper.modalToLarkCard(modal as unknown as ModalInput, contextId ?? '')
+    const decoded: LarkThreadId = { chatId }
+    const res = await this.sendCardMessage(decoded, cardJson)
+    const messageId = res.data?.message_id ?? ''
+    return { viewId: messageId }
+  }
+
   // -- Streaming --
 
   async stream(
@@ -672,33 +695,162 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   private handleCardAction(body: LarkCardActionBody, options?: WebhookOptions): void {
     const event = body.event
-    const context = body.context
+    const context = event?.context
     if (!event?.action || !context?.open_chat_id) {
       return
     }
-    const actionValue = event.action.value ?? {}
+    const action = event.action
+    const chatId = context.open_chat_id
+    const messageId = context.open_message_id ?? ''
+    const userId = event.operator?.open_id ?? ''
+    const isModal = action.value?.['__modal'] === MODAL_MARKER
+
+    if (isModal && action.form_value) {
+      this.dispatchModalSubmit(action, userId, messageId, chatId, options)
+    } else if (isModal && action.form_action_type === 'reset') {
+      this.dispatchModalClose(action, userId, messageId, options)
+    } else {
+      this.dispatchAction(action, userId, messageId, chatId, event.token, options)
+    }
+  }
+
+  private dispatchModalSubmit(
+    action: NonNullable<NonNullable<LarkCardActionBody['event']>['action']>,
+    userId: string,
+    messageId: string,
+    chatId: string,
+    options?: WebhookOptions,
+  ): void {
+    const callbackId = String(action.value?.['__callbackId'] ?? '')
+    const contextId = action.value?.['__contextId'] as string | undefined
+    const privateMetadata = action.value?.['__privateMetadata'] as string | undefined
+    const values: Record<string, string> = {}
+    if (action.form_value) {
+      for (const [key, val] of Object.entries(action.form_value)) {
+        values[key] = Array.isArray(val) ? val.join(', ') : String(val)
+      }
+    }
+    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
+
+    void this.chat
+      .processModalSubmit(
+        {
+          adapter: this,
+          callbackId,
+          privateMetadata,
+          raw: action,
+          user,
+          values,
+          viewId: messageId,
+        },
+        contextId,
+        options,
+      )
+      .then((response) => {
+        if (response) {
+          this.handleModalResponse(response, messageId, chatId)
+        }
+        return undefined
+      })
+      .catch((err: unknown) => {
+        this.logger?.error?.('Modal submit processing error', err)
+      })
+  }
+
+  private dispatchModalClose(
+    action: NonNullable<NonNullable<LarkCardActionBody['event']>['action']>,
+    userId: string,
+    messageId: string,
+    options?: WebhookOptions,
+  ): void {
+    if (action.value?.['__notifyOnClose'] !== '1') {
+      return
+    }
+    const callbackId = String(action.value?.['__callbackId'] ?? '')
+    const contextId = action.value?.['__contextId'] as string | undefined
+    const privateMetadata = action.value?.['__privateMetadata'] as string | undefined
+    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
+
+    this.chat.processModalClose(
+      { adapter: this, callbackId, privateMetadata, raw: action, user, viewId: messageId },
+      contextId,
+      options,
+    )
+  }
+
+  private dispatchAction(
+    action: NonNullable<NonNullable<LarkCardActionBody['event']>['action']>,
+    userId: string,
+    messageId: string,
+    chatId: string,
+    token?: string,
+    options?: WebhookOptions,
+  ): void {
+    const actionValue = action.value ?? {}
     const actionId = String(actionValue['id'] ?? '')
-    const value = event.action.option ?? String(actionValue['action'] ?? '')
-    const threadId = this.encodeThreadId({ chatId: context.open_chat_id })
+    const value = action.option ?? String(actionValue['action'] ?? '')
+    const threadId = this.encodeThreadId({ chatId })
+    const triggerId = `${chatId}:${messageId}`
+    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
+
     this.chat.processAction(
       {
         actionId,
         adapter: this,
-        messageId: context.open_message_id ?? '',
-        raw: body,
+        messageId,
+        raw: action,
         threadId,
-        triggerId: event.token,
-        user: {
-          fullName: '',
-          isBot: false,
-          isMe: false,
-          userId: event.operator?.open_id ?? '',
-          userName: '',
-        },
+        triggerId,
+        user,
         value: value || undefined,
       },
       options,
     )
+  }
+
+  private handleModalResponse(response: ModalResponse, messageId: string, chatId: string): void {
+    if (!response || response.action === 'close') {
+      return
+    }
+
+    if (response.action === 'errors') {
+      const errorText = Object.entries(response.errors)
+        .map(([field, msg]) => `**${field}**: ${msg}`)
+        .join('\n')
+      const errorCard: LarkCardBody = {
+        body: {
+          elements: [
+            {
+              content: `\u26a0\ufe0f **Validation errors**\n${errorText}`,
+              element_id: 'err_md',
+              tag: 'markdown',
+            },
+          ],
+        },
+        config: { update_multi: true },
+        schema: '2.0',
+      }
+      void this.api.patchCard(messageId, JSON.stringify(errorCard)).catch((err: unknown) => {
+        this.logger?.error?.('Failed to update card with errors', err)
+      })
+      return
+    }
+
+    if (response.action === 'update') {
+      const cardJson = modalMapper.modalToLarkCard(response.modal as unknown as ModalInput, '')
+      void this.api.patchCard(messageId, JSON.stringify(cardJson)).catch((err: unknown) => {
+        this.logger?.error?.('Failed to update modal card', err)
+      })
+      return
+    }
+
+    if (response.action === 'push') {
+      const cardJson = modalMapper.modalToLarkCard(response.modal as unknown as ModalInput, '')
+      const decoded: LarkThreadId = { chatId }
+      void this.sendCardMessage(decoded, cardJson).catch((err: unknown) => {
+        this.logger?.error?.('Failed to push modal card', err)
+      })
+    }
   }
 
   private dispatchEvent(body: LarkWebhookBody, options?: WebhookOptions): void {

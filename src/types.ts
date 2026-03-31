@@ -162,6 +162,8 @@ interface LarkButtonElement {
   element_id: string
   behaviors: LarkBehavior[]
   disabled?: boolean
+  form_action_type?: 'submit' | 'reset'
+  name?: string
 }
 
 interface LarkSelectElement {
@@ -171,6 +173,31 @@ interface LarkSelectElement {
   behaviors: LarkBehavior[]
   placeholder?: LarkPlainText
   initial_option?: string
+  name?: string
+  required?: boolean
+  width?: string
+}
+
+/** Lark input element for form containers (card JSON 2.0). */
+interface LarkInputElement {
+  tag: 'input'
+  element_id: string
+  name: string
+  required?: boolean
+  placeholder?: LarkPlainText
+  default_value?: string
+  label?: LarkPlainText
+  label_position?: 'top' | 'left'
+  input_type?: 'text' | 'multiline_text' | 'password'
+  max_length?: number
+  width?: string
+}
+
+/** Lark form container element (card JSON 2.0). */
+interface LarkFormElement {
+  tag: 'form'
+  name: string
+  elements: LarkCardElement[]
 }
 
 interface LarkColumn {
@@ -205,8 +232,10 @@ interface LarkTableElement {
 type LarkCardElement =
   | LarkButtonElement
   | LarkColumnSetElement
+  | LarkFormElement
   | LarkHrElement
   | LarkImgElement
+  | LarkInputElement
   | LarkMarkdownElement
   | LarkSelectElement
   | LarkTableElement
@@ -258,23 +287,28 @@ interface LarkWebhookBody {
   type?: string
 }
 
-/** card.action.trigger callback (v2 schema). */
+/**
+ * card.action.trigger callback (v2 schema).
+ * NOT handled by EventDispatcher — routed at the webhook level.
+ */
 interface LarkCardActionBody extends LarkWebhookBody {
   event?: {
-    operator?: { open_id?: string; union_id?: string; user_id?: string }
+    operator?: { open_id?: string; union_id?: string; user_id?: string; tenant_key?: string }
     token?: string
     action?: {
       tag?: string
-      value?: Record<string, unknown>
+      value?: Record<string, string>
       option?: string
       input_value?: string
-      form_value?: Record<string, unknown>
+      form_value?: Record<string, string | string[]>
       name?: string
+      form_action_type?: string
     }
-  }
-  context?: {
-    open_message_id?: string
-    open_chat_id?: string
+    host?: string
+    context?: {
+      open_message_id?: string
+      open_chat_id?: string
+    }
   }
 }
 
@@ -301,16 +335,18 @@ export type {
   CardChild,
   CardKitCard,
   LarkAdapterConfig,
-  LarkCardActionBody,
   LarkBehavior,
   LarkButtonElement,
+  LarkCardActionBody,
   LarkCardBody,
   LarkCardElement,
   LarkCardHeader,
   LarkColumnSetElement,
   LarkFileType,
+  LarkFormElement,
   LarkHrElement,
   LarkImgElement,
+  LarkInputElement,
   LarkInteractiveContent,
   LarkMarkdownElement,
   LarkMessageContent,

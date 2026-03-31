@@ -9,6 +9,8 @@ const {
   makeCardActionEvent,
   makeChallengeEvent,
   makeMessageEvent,
+  makeModalResetEvent,
+  makeModalSubmitEvent,
   makeReactionEvent,
   makeRequest,
   makeSelectActionEvent,
@@ -278,7 +280,7 @@ describe('LarkAdapter', () => {
       expect(actionEvent.value).toBe('order_123')
       expect(actionEvent.messageId).toBe('om_card_msg001')
       expect(adapter.channelIdFromThreadId(actionEvent.threadId)).toBe('oc_chat001')
-      expect(actionEvent.triggerId).toBe('c-card-token-001')
+      expect(actionEvent.triggerId).toBe('oc_chat001:om_card_msg001')
       expect(actionEvent.user.userId).toBe('ou_user1')
     })
 
@@ -304,6 +306,85 @@ describe('LarkAdapter', () => {
       await adapter.handleWebhook(makeRequest(event))
       await adapter.handleWebhook(makeRequest(event))
       expect(mockChat.processAction).toHaveBeenCalledTimes(ONCE)
+    })
+
+    it('routes modal form submit to processModalSubmit', async () => {
+      const adapter = makeAdapter()
+      const mockChat = await initAdapter(adapter)
+      mockChat.processModalSubmit.mockResolvedValue(undefined)
+
+      const event = makeModalSubmitEvent(
+        'feedback_form',
+        { message: 'Great!' },
+        'ctx_1',
+        '{"k":"v"}',
+      )
+      await adapter.handleWebhook(makeRequest(event))
+
+      // processModalSubmit is called async — wait a tick
+      await new Promise((r) => setTimeout(r, 0))
+      expect(mockChat.processModalSubmit).toHaveBeenCalledTimes(ONCE)
+
+      const call = mockChat.processModalSubmit.mock.calls[FIRST_MESSAGE]!
+      const submitEvent = call[0] as {
+        callbackId: string
+        privateMetadata: string
+        values: Record<string, string>
+        viewId: string
+      }
+      expect(submitEvent.callbackId).toBe('feedback_form')
+      expect(submitEvent.values).toEqual({ message: 'Great!' })
+      expect(submitEvent.privateMetadata).toBe('{"k":"v"}')
+      expect(submitEvent.viewId).toBe('om_form_msg001')
+      // contextId is the second argument
+      expect(call[1]).toBe('ctx_1')
+    })
+
+    it('routes modal form reset with notifyOnClose to processModalClose', async () => {
+      const adapter = makeAdapter()
+      const mockChat = await initAdapter(adapter)
+
+      const event = makeModalResetEvent('feedback_form', true)
+      await adapter.handleWebhook(makeRequest(event))
+
+      expect(mockChat.processModalClose).toHaveBeenCalledTimes(ONCE)
+      const call = mockChat.processModalClose.mock.calls[FIRST_MESSAGE]!
+      const closeEvent = call[0] as { callbackId: string }
+      expect(closeEvent.callbackId).toBe('feedback_form')
+    })
+
+    it('does not call processModalClose when notifyOnClose is false', async () => {
+      const adapter = makeAdapter()
+      const mockChat = await initAdapter(adapter)
+
+      const event = makeModalResetEvent('feedback_form', false)
+      await adapter.handleWebhook(makeRequest(event))
+
+      expect(mockChat.processModalClose).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('openModal', () => {
+    it('sends a form card and returns viewId', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+
+      server.use(
+        http.post(`${BASE}/open-apis/im/v1/messages`, () =>
+          HttpResponse.json({ code: 0, data: { message_id: 'om_modal001' } }),
+        ),
+      )
+
+      const modal = {
+        callbackId: 'fb_form',
+        children: [{ id: 'msg', label: 'Message', type: 'text_input' as const }],
+        submitLabel: 'Send',
+        title: 'Feedback',
+        type: 'modal' as const,
+      }
+
+      const result = await adapter.openModal('oc_chat001:om_trigger', modal, 'ctx_1')
+      expect(result.viewId).toBe('om_modal001')
     })
   })
 

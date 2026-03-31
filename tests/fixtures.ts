@@ -92,14 +92,14 @@ const makeRequest = (body: unknown): Request =>
 
 /** Card action callback (card.action.trigger). */
 const makeCardActionEvent = (actionId = 'approve', value = 'order_123') => ({
-  context: {
-    open_chat_id: 'oc_chat001',
-    open_message_id: 'om_card_msg001',
-  },
   event: {
     action: {
       tag: 'button',
       value: { action: value, id: actionId },
+    },
+    context: {
+      open_chat_id: 'oc_chat001',
+      open_message_id: 'om_card_msg001',
     },
     operator: { open_id: 'ou_user1', union_id: 'un1' },
     token: 'c-card-token-001',
@@ -117,15 +117,15 @@ const makeCardActionEvent = (actionId = 'approve', value = 'order_123') => ({
 
 /** Card select action callback. */
 const makeSelectActionEvent = (actionId = 'priority', option = 'high') => ({
-  context: {
-    open_chat_id: 'oc_chat001',
-    open_message_id: 'om_card_msg002',
-  },
   event: {
     action: {
       option,
       tag: 'select_static',
       value: { id: actionId },
+    },
+    context: {
+      open_chat_id: 'oc_chat001',
+      open_message_id: 'om_card_msg002',
     },
     operator: { open_id: 'ou_user1' },
     token: 'c-card-token-002',
@@ -141,11 +141,82 @@ const makeSelectActionEvent = (actionId = 'priority', option = 'high') => ({
   schema: '2.0',
 })
 
+/** Modal form submit callback (card.action.trigger with form_value). */
+const makeModalSubmitEvent = (
+  callbackId = 'feedback_form',
+  formValues: Record<string, string> = { message: 'Great!', category: 'general' },
+  contextId = 'ctx_123',
+  privateMetadata?: string,
+) => ({
+  event: {
+    action: {
+      form_action_type: 'submit',
+      form_value: formValues,
+      name: 'submit_btn',
+      tag: 'button',
+      value: {
+        __callbackId: callbackId,
+        __contextId: contextId,
+        __modal: '1',
+        ...(privateMetadata ? { __privateMetadata: privateMetadata } : {}),
+      },
+    },
+    context: {
+      open_chat_id: 'oc_chat001',
+      open_message_id: 'om_form_msg001',
+    },
+    operator: { open_id: 'ou_user1' },
+    token: 'c-form-token-001',
+  },
+  header: {
+    app_id: 'test-app-id',
+    create_time: '1700000000000',
+    event_id: 'ev-form-submit-001',
+    event_type: 'card.action.trigger',
+    tenant_key: 'test-tenant',
+    token: 'test-verification-token',
+  },
+  schema: '2.0',
+})
+
+/** Modal form reset/cancel callback. */
+const makeModalResetEvent = (callbackId = 'feedback_form', notifyOnClose = true) => ({
+  event: {
+    action: {
+      form_action_type: 'reset',
+      tag: 'button',
+      value: {
+        __callbackId: callbackId,
+        __contextId: 'ctx_123',
+        __modal: '1',
+        ...(notifyOnClose ? { __notifyOnClose: '1' } : {}),
+      },
+    },
+    context: {
+      open_chat_id: 'oc_chat001',
+      open_message_id: 'om_form_msg001',
+    },
+    operator: { open_id: 'ou_user1' },
+    token: 'c-form-token-002',
+  },
+  header: {
+    app_id: 'test-app-id',
+    create_time: '1700000000000',
+    event_id: 'ev-form-reset-001',
+    event_type: 'card.action.trigger',
+    tenant_key: 'test-tenant',
+    token: 'test-verification-token',
+  },
+  schema: '2.0',
+})
+
 const fixtures = {
   makeCardActionEvent,
   makeChallengeEvent,
   makeDMEvent,
   makeMessageEvent,
+  makeModalResetEvent,
+  makeModalSubmitEvent,
   makeReactionEvent,
   makeRequest,
   makeSelectActionEvent,
