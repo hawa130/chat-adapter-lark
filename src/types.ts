@@ -29,6 +29,8 @@ interface LarkAdapterConfig {
   cache?: Cache
   /** Custom HTTP client instance for proxy, timeout, or interceptor support */
   httpInstance?: HttpInstance
+  /** Custom summary text shown in chat list during card streaming (defaults to Lark's "[生成中...]") */
+  streamingSummary?: string
 }
 
 /** Raw event data from im.message.receive_v1, as delivered by the SDK's EventDispatcher. */
@@ -261,7 +263,7 @@ interface LarkCardHeader {
 
 interface LarkCardBody {
   schema: '2.0'
-  config: { streaming_mode?: boolean; update_multi: true }
+  config: { streaming_mode?: boolean; summary?: { content: string }; update_multi: true }
   header?: LarkCardHeader
   body: { elements: LarkCardElement[] }
 }

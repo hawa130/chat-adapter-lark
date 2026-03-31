@@ -583,7 +583,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     } finally {
       await this.api.updateCardSettings(
         cardId,
-        JSON.stringify({ config: { streaming_mode: false } }),
+        JSON.stringify({ config: { streaming_mode: false, summary: { content: '' } } }),
         sequence,
       )
     }
@@ -1114,7 +1114,13 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       body: {
         elements: [{ content: '', element_id: STREAM_ELEMENT_ID, tag: 'markdown' }],
       },
-      config: { streaming_mode: true, update_multi: true },
+      config: {
+        streaming_mode: true,
+        ...(this.config.streamingSummary !== undefined && {
+          summary: { content: this.config.streamingSummary },
+        }),
+        update_multi: true,
+      },
       schema: '2.0',
     }
     const res = await this.api.createCard(JSON.stringify(cardJson))
