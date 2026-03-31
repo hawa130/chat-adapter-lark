@@ -274,6 +274,27 @@ interface LarkTextContent {
   text: string
 }
 
+interface LarkImageContent {
+  image_key: string
+}
+
+interface LarkFileContent {
+  file_key: string
+  file_name: string
+}
+
+interface LarkAudioContent {
+  file_key: string
+  duration: number
+}
+
+interface LarkMediaContent {
+  file_key: string
+  image_key: string
+  file_name: string
+  duration: number
+}
+
 interface LarkPostContent {
   post: Record<
     string,
@@ -344,6 +365,7 @@ export type {
   CardChild,
   CardKitCard,
   LarkAdapterConfig,
+  LarkAudioContent,
   LarkBehavior,
   LarkButtonElement,
   LarkCardActionBody,
@@ -351,13 +373,16 @@ export type {
   LarkCardElement,
   LarkCardHeader,
   LarkColumnSetElement,
+  LarkFileContent,
   LarkFileType,
   LarkFormElement,
   LarkHrElement,
+  LarkImageContent,
   LarkImgElement,
   LarkInputElement,
   LarkInteractiveContent,
   LarkMarkdownElement,
+  LarkMediaContent,
   LarkMessageContent,
   LarkMessageItem,
   LarkPostContent,

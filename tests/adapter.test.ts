@@ -554,6 +554,75 @@ describe('LarkAdapter', () => {
       expect(() => adapter.parseMessage(raw)).not.toThrow()
       expect(adapter.parseMessage(raw).text).toBe('no mentions here')
     })
+
+    it('parses image message with attachment', () => {
+      const raw = makeRaw({
+        message: {
+          ...makeRaw().message,
+          content: '{"image_key":"img_test_001"}',
+          message_type: 'image',
+        },
+      })
+      const message = adapter.parseMessage(raw)
+      expect(message.attachments).toHaveLength(1)
+      expect(message.attachments[0]!.type).toBe('image')
+      expect(message.attachments[0]!.fetchData).toBeTypeOf('function')
+      expect(message.text).toBe('')
+    })
+
+    it('parses file message with attachment', () => {
+      const raw = makeRaw({
+        message: {
+          ...makeRaw().message,
+          content: '{"file_key":"file_test_001","file_name":"report.pdf"}',
+          message_type: 'file',
+        },
+      })
+      const message = adapter.parseMessage(raw)
+      expect(message.attachments).toHaveLength(1)
+      expect(message.attachments[0]!.type).toBe('file')
+      expect(message.attachments[0]!.name).toBe('report.pdf')
+      expect(message.attachments[0]!.fetchData).toBeTypeOf('function')
+      expect(message.text).toBe('')
+    })
+
+    it('parses audio message with attachment', () => {
+      const raw = makeRaw({
+        message: {
+          ...makeRaw().message,
+          content: '{"file_key":"file_audio_001","duration":5000}',
+          message_type: 'audio',
+        },
+      })
+      const message = adapter.parseMessage(raw)
+      expect(message.attachments).toHaveLength(1)
+      expect(message.attachments[0]!.type).toBe('audio')
+      expect(message.attachments[0]!.fetchData).toBeTypeOf('function')
+      expect(message.text).toBe('')
+    })
+
+    it('parses media (video) message with attachment', () => {
+      const raw = makeRaw({
+        message: {
+          ...makeRaw().message,
+          content:
+            '{"file_key":"file_video_001","image_key":"img_thumb_001","file_name":"demo.mp4","duration":10000}',
+          message_type: 'media',
+        },
+      })
+      const message = adapter.parseMessage(raw)
+      expect(message.attachments).toHaveLength(1)
+      expect(message.attachments[0]!.type).toBe('video')
+      expect(message.attachments[0]!.name).toBe('demo.mp4')
+      expect(message.attachments[0]!.fetchData).toBeTypeOf('function')
+      expect(message.text).toBe('')
+    })
+
+    it('returns empty attachments for text messages', () => {
+      const message = adapter.parseMessage(makeRaw())
+      expect(message.attachments).toHaveLength(0)
+      expect(message.text).toBe('hello bot')
+    })
   })
 
   describe('message sending', () => {

@@ -1,7 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import type { Readable } from 'node:stream'
 import type {
   Adapter,
   AdapterPostableMessage,
+  Attachment,
   ChannelInfo,
   ChannelVisibility,
   ChatInstance,
@@ -180,6 +182,16 @@ const MIME_TO_LARK_FILE_TYPE: Record<string, LarkFileType> = {
 
 const mimeToLarkFileType = (mime: string): LarkFileType => MIME_TO_LARK_FILE_TYPE[mime] ?? 'stream'
 
+const MEDIA_MESSAGE_TYPES = new Set(['image', 'file', 'audio', 'media'])
+
+const streamToBuffer = async (stream: Readable): Promise<Buffer> => {
+  const chunks: Buffer[] = []
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array))
+  }
+  return Buffer.concat(chunks)
+}
+
 const mapChatTypeToVisibility = (chatType: string | undefined): ChannelVisibility => {
   if (chatType === 'public') {
     return 'workspace'
@@ -322,8 +334,10 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   parseMessage(raw: LarkRawMessage): Message<LarkRaw> {
     const msg = raw.message
+    const messageType = msg.message_type ?? ''
+    const isMedia = MEDIA_MESSAGE_TYPES.has(messageType)
     return new Message<LarkRaw>({
-      attachments: [],
+      attachments: this.buildAttachments(msg.message_id, messageType, msg.content),
       author: buildAuthor(raw, this.botOpenId),
       formatted: this.converter.toAst(msg.content),
       id: msg.message_id,
@@ -333,7 +347,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         edited: msg.update_time != null && msg.update_time !== msg.create_time,
       },
       raw,
-      text: this.resolveText(msg),
+      text: isMedia ? '' : this.resolveText(msg),
       threadId: this.encodeThreadId({
         chatId: msg.chat_id,
         rootMessageId: msg.root_id || undefined,
@@ -607,6 +621,78 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   }
 
   // -- Private helpers --
+
+  private buildAttachments(messageId: string, messageType: string, content: string): Attachment[] {
+    try {
+      const parsed = JSON.parse(content) as Record<string, unknown>
+      switch (messageType) {
+        case 'image': {
+          const imageKey = parsed.image_key as string
+          return [
+            {
+              type: 'image' as const,
+              fetchData: async () => {
+                const res = await this.api.downloadResource(messageId, imageKey, 'image')
+                return streamToBuffer(
+                  (res as { getReadableStream: () => Readable }).getReadableStream(),
+                )
+              },
+            },
+          ]
+        }
+        case 'file': {
+          const fileKey = parsed.file_key as string
+          const fileName = parsed.file_name as string
+          return [
+            {
+              type: 'file' as const,
+              name: fileName,
+              fetchData: async () => {
+                const res = await this.api.downloadResource(messageId, fileKey, 'file')
+                return streamToBuffer(
+                  (res as { getReadableStream: () => Readable }).getReadableStream(),
+                )
+              },
+            },
+          ]
+        }
+        case 'audio': {
+          const fileKey = parsed.file_key as string
+          return [
+            {
+              type: 'audio' as const,
+              fetchData: async () => {
+                const res = await this.api.downloadResource(messageId, fileKey, 'file')
+                return streamToBuffer(
+                  (res as { getReadableStream: () => Readable }).getReadableStream(),
+                )
+              },
+            },
+          ]
+        }
+        case 'media': {
+          const fileKey = parsed.file_key as string
+          const fileName = parsed.file_name as string
+          return [
+            {
+              type: 'video' as const,
+              name: fileName,
+              fetchData: async () => {
+                const res = await this.api.downloadResource(messageId, fileKey, 'file')
+                return streamToBuffer(
+                  (res as { getReadableStream: () => Readable }).getReadableStream(),
+                )
+              },
+            },
+          ]
+        }
+        default:
+          return []
+      }
+    } catch {
+      return []
+    }
+  }
 
   private cacheChannelType(chatId: string, chatType: string, name?: string): void {
     this.channelTypeMap.set(chatId, chatType)
@@ -1065,6 +1151,9 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   private async itemToMessage(item: LarkMessageItem, threadId: string): Promise<Message<LarkRaw>> {
     const content = item.body?.content ?? ''
+    const messageId = item.message_id ?? ''
+    const messageType = item.msg_type ?? ''
+    const isMedia = MEDIA_MESSAGE_TYPES.has(messageType)
     const sender = item.sender
     const senderId = sender?.id ?? ''
     const resolvedName = senderId ? await this.lookupUser(senderId) : 'unknown'
@@ -1078,16 +1167,16 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         }
       : unknownAuthor()
     return new Message<LarkRaw>({
-      attachments: [],
+      attachments: this.buildAttachments(messageId, messageType, content),
       author,
       formatted: this.converter.toAst(content),
-      id: item.message_id ?? '',
+      id: messageId,
       metadata: {
         dateSent: new Date(Number(item.create_time ?? '0')),
         edited: item.updated === true,
       },
       raw: item,
-      text: extractText(content),
+      text: isMedia ? '' : extractText(content),
       threadId,
     })
   }

@@ -210,6 +210,15 @@ class LarkApiClient {
     )
   }
 
+  async downloadResource(messageId: string, fileKey: string, type: 'file' | 'image') {
+    return this.call(() =>
+      this.client.im.messageResource.get({
+        path: { message_id: messageId, file_key: fileKey },
+        params: { type },
+      }),
+    )
+  }
+
   async getBotInfo() {
     const res = await this.call(() =>
       this.client.request({ method: 'GET', url: '/open-apis/bot/v3/info' }),
