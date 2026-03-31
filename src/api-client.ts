@@ -5,7 +5,7 @@ import {
   PermissionError,
   ResourceNotFoundError,
 } from '@chat-adapter/shared'
-import type { LarkAdapterConfig, LarkFileType, LarkSdkError } from './types.ts'
+import type { LarkAdapterConfig, LarkCardBody, LarkFileType, LarkSdkError } from './types.ts'
 
 type ApiLogger = {
   debug(...args: unknown[]): void
@@ -212,7 +212,7 @@ class LarkApiClient {
     return res as { bot?: { app_name?: string; open_id?: string } }
   }
 
-  async sendEphemeral(chatId: string, userId: string, card: unknown) {
+  async sendEphemeral(chatId: string, userId: string, card: LarkCardBody) {
     return this.call(() =>
       this.client.request({
         data: { card, chat_id: chatId, msg_type: 'interactive', open_id: userId },

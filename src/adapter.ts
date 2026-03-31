@@ -50,6 +50,9 @@ type EventData<TKey extends keyof EventHandles> =
     ? TData
     : never
 
+/** Recursive node shape for traversing card trees to upload images. */
+type CardImageNode = { children?: CardImageNode[]; imageUrl?: string; type?: string; url?: string }
+
 const ADAPTER_NAME = 'lark'
 const CARD_ACTION_EVENT_TYPE = 'card.action.trigger'
 const MODAL_MARKER = '1'
@@ -907,7 +910,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return this.extractImageKey(uploadRes) || null
   }
 
-  private async uploadUrlToImageKey<TNode extends Record<string, unknown>>(
+  private async uploadUrlToImageKey<TNode extends Record<string, string | undefined>>(
     node: TNode,
     field: string & keyof TNode,
   ): Promise<void> {
@@ -918,7 +921,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     try {
       const key = await this.fetchAndUploadImage(url)
       if (key) {
-        ;(node as Record<string, unknown>)[field] = key
+        node[field] = key as TNode[typeof field]
       }
     } catch {
       this.logger?.warn?.('Failed to upload card image', { field, url })
@@ -926,7 +929,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   }
 
   private async uploadCardImages(
-    node: { children?: unknown[]; imageUrl?: string; type?: string; url?: string },
+    node: { children?: CardImageNode[]; imageUrl?: string; type?: string; url?: string },
     isRoot = true,
   ): Promise<void> {
     if (node.type === 'image') {
@@ -936,10 +939,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       await this.uploadUrlToImageKey(node, 'imageUrl')
     }
     if (node.children) {
-      type CardNode = typeof node
-      await Promise.all(
-        node.children.map((child) => this.uploadCardImages(child as CardNode, false)),
-      )
+      await Promise.all(node.children.map((child) => this.uploadCardImages(child, false)))
     }
   }
 

@@ -124,7 +124,7 @@ interface CardChild {
   title?: string
   type: string
   url?: string
-  value?: unknown
+  value?: string
 }
 
 // ---------------------------------------------------------------------------
