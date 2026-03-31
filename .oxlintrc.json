@@ -42,7 +42,10 @@
 
     // style: import 相关
     "no-duplicate-imports": ["warn", { "allowSeparateTypeImports": true }],
-    "sort-imports": "off"
+    "sort-imports": "off",
+
+    // eslint-disable 必须指定具体规则名
+    "unicorn/no-abusive-eslint-disable": "error"
   },
   "overrides": [
     {

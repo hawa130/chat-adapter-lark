@@ -124,7 +124,6 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('integration', () => {
-  // -- Full send/receive flow --
   it('full send/receive: webhook event triggers processMessage and posts reply', async () => {
     const adapter = makeAdapter()
     const mockChat = await initAdapter(adapter)
@@ -144,7 +143,6 @@ describe('integration', () => {
     expect(postedBody).toMatchObject({ msg_type: 'text', receive_id: 'oc_chat001' })
   })
 
-  // -- Thread reply flow --
   it('thread reply: event with root_id causes replyMessage to be used', async () => {
     const adapter = makeAdapter()
     const mockChat = await initAdapter(adapter)
@@ -168,7 +166,6 @@ describe('integration', () => {
     expect(repliedToId).toBe('om_root1')
   })
 
-  // -- Streaming E2E --
   it('streaming: creates card entity, streams text, closes streaming mode', async () => {
     const adapter = makeAdapter()
     await initAdapter(adapter)
@@ -199,7 +196,6 @@ describe('integration', () => {
     expect(streamUpdates[streamUpdates.length - LAST_INDEX_OFFSET]).toContain('Hello world!')
   })
 
-  // -- Event deduplication --
   it('deduplication: same event_id sent twice calls processMessage only once', async () => {
     const adapter = makeAdapter()
     const mockChat = await initAdapter(adapter)
@@ -214,7 +210,6 @@ describe('integration', () => {
     expect(mockChat.processMessage).toHaveBeenCalledOnce()
   })
 
-  // -- DM flow --
   it('DM flow: p2p event sets isMention=true; openDM makes isDM return true', async () => {
     const adapter = makeAdapter()
     const mockChat = await initAdapter(adapter)
@@ -235,7 +230,6 @@ describe('integration', () => {
     expect(adapter.isDM(dmThreadId)).toBe(true)
   })
 
-  // -- Rate limit handling --
   it('rate limit: API returns 429 → postMessage throws AdapterRateLimitError', async () => {
     const adapter = makeAdapter()
     await initAdapter(adapter)
@@ -251,7 +245,6 @@ describe('integration', () => {
     })
   })
 
-  // -- openDM creates chat --
   it('openDM: calls create chat API and isDM returns true for new thread', async () => {
     const adapter = makeAdapter()
     await initAdapter(adapter)

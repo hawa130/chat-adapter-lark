@@ -101,7 +101,6 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('LarkAdapter', () => {
-  // -- 7A: Thread ID encoding --
   describe('thread ID encoding', () => {
     it('encodes chatId only', () => {
       const adapter = makeAdapter()
@@ -159,7 +158,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7B: Webhook handling --
   describe('handleWebhook', () => {
     it('handles URL verification challenge', async () => {
       const adapter = makeAdapter()
@@ -230,7 +228,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7C: Message parsing --
   describe('parseMessage', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -318,7 +315,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7D: Message sending --
   describe('message sending', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -408,7 +404,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7E: Reactions --
   describe('reactions', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -469,7 +464,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7F: Fetch methods --
   describe('fetch methods', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -559,7 +553,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7F: DM --
   describe('DM', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -586,7 +579,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7F: Misc --
   describe('misc', () => {
     it('startTyping is a no-op', async () => {
       const adapter = makeAdapter()
@@ -607,7 +599,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7G: Streaming --
   describe('stream', () => {
     let adapter: LarkAdapter = undefined!
 
@@ -681,7 +672,6 @@ describe('LarkAdapter', () => {
     })
   })
 
-  // -- 7H: Ephemeral --
   describe('ephemeral', () => {
     let adapter: LarkAdapter = undefined!
 

@@ -551,8 +551,8 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       options.waitUntil(promise)
       return
     }
-    // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks
-    void promise.then(undefined, (err: unknown) => {
+    // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- fire-and-forget: must not await to avoid blocking HTTP response
+    void promise.catch((err: unknown) => {
       this.logger?.error?.('Event processing error', err)
     })
   }

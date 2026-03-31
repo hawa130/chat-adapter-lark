@@ -24,7 +24,6 @@ describe('bridgeWebhook', () => {
     const req = makeRequest(makeChallengeEvent('abc123'))
     const response = await bridgeWebhook(req, dispatcher)
 
-    // The SDK should return challenge response
     expect(response).toBeDefined()
     const str = JSON.stringify(response)
     expect(str).toContain('abc123')
