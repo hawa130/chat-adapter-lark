@@ -187,24 +187,6 @@ describe('LarkAdapter', () => {
       expect((await adapter.handleWebhook(req)).status).toBe(HTTP_BAD_REQUEST)
     })
 
-    it('deduplicates events by event_id', async () => {
-      const adapter = makeAdapter()
-      const mockChat = await initAdapter(adapter)
-
-      const event = makeMessageEvent()
-      const promises: Array<Promise<unknown>> = []
-      const options = {
-        waitUntil: (task: Promise<unknown>) => {
-          promises.push(task)
-        },
-      }
-
-      expect((await adapter.handleWebhook(makeRequest(event), options)).status).toBe(HTTP_OK)
-      expect((await adapter.handleWebhook(makeRequest(event), options)).status).toBe(HTTP_OK)
-      await Promise.allSettled(promises)
-      expect(mockChat.processMessage).toHaveBeenCalledTimes(ONCE)
-    })
-
     it('returns 200 immediately for normal events', async () => {
       const adapter = makeAdapter()
       await initAdapter(adapter)
@@ -290,16 +272,6 @@ describe('LarkAdapter', () => {
       const actionEvent = call[0] as { actionId: string; value: string }
       expect(actionEvent.actionId).toBe('priority')
       expect(actionEvent.value).toBe('high')
-    })
-
-    it('deduplicates card action events', async () => {
-      const adapter = makeAdapter()
-      const mockChat = await initAdapter(adapter)
-
-      const event = makeCardActionEvent()
-      await adapter.handleWebhook(makeRequest(event))
-      await adapter.handleWebhook(makeRequest(event))
-      expect(mockChat.processAction).toHaveBeenCalledTimes(ONCE)
     })
 
     it('routes modal form submit to processModalSubmit', async () => {

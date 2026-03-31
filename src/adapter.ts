@@ -36,7 +36,6 @@ import { ValidationError, extractCard, extractFiles, toBuffer } from '@chat-adap
 import type { EventHandles } from '@larksuiteoapi/node-sdk'
 import { EventDispatcher } from '@larksuiteoapi/node-sdk'
 import { ConsoleLogger, Message } from 'chat'
-import { DedupCache } from './dedup-cache.ts'
 import { LarkApiClient } from './api-client.ts'
 import { LarkFormatConverter } from './format-converter.ts'
 import { bridgeWebhook } from './event-bridge.ts'
@@ -54,8 +53,6 @@ type EventData<TKey extends keyof EventHandles> =
 type CardImageNode = { children?: CardImageNode[]; imageUrl?: string; type?: string; url?: string }
 
 const ADAPTER_NAME = 'lark'
-const CARD_ACTION_EVENT_TYPE = 'card.action.trigger'
-const DEDUP_CAPACITY = 500
 const STREAM_ELEMENT_ID = 'stream_md'
 const INITIAL_SEQUENCE = 1
 const MIN_DECODE_PARTS = 2
@@ -106,8 +103,6 @@ const extractEmojiName = (emoji: EmojiValue | string): string => {
   }
   return emoji.name
 }
-
-const extractEventId = (body: LarkWebhookBody): string | undefined => body.header?.event_id
 
 const extractText = (content: string): string => {
   try {
@@ -229,7 +224,6 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   private readonly config: LarkAdapterConfig
   private api!: LarkApiClient
   private readonly converter = new LarkFormatConverter()
-  private readonly dedup = new DedupCache(DEDUP_CAPACITY)
   private readonly dispatcher: EventDispatcher
   private readonly dmCache = new Set<string>()
   private pendingWebhookOptions?: WebhookOptions
@@ -272,9 +266,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     this.logger.info('Initialized', { botOpenId: this.botOpenId })
   }
 
-  async disconnect(): Promise<void> {
-    this.dedup.clear()
-  }
+  async disconnect(): Promise<void> {}
 
   // -- Thread ID encoding --
 
@@ -691,14 +683,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   }
 
   private handleEvent(body: LarkWebhookBody, options?: WebhookOptions): Response {
-    const eventId = extractEventId(body)
-    if (eventId && this.dedup.has(eventId)) {
-      return new Response('ok', { status: HTTP_OK })
-    }
-    if (eventId) {
-      this.dedup.add(eventId)
-    }
-    if (body.header?.event_type === CARD_ACTION_EVENT_TYPE) {
+    if (body.header?.event_type === 'card.action.trigger') {
       this.handleCardAction(body as LarkCardActionBody, options)
     } else {
       this.dispatchEvent(body, options)
