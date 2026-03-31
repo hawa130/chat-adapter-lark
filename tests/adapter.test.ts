@@ -8,6 +8,7 @@ import { server } from './setup.ts'
 const {
   makeCardActionEvent,
   makeChallengeEvent,
+  makeDMEvent,
   makeMessageEvent,
   makeModalResetEvent,
   makeModalSubmitEvent,
@@ -922,6 +923,36 @@ describe('LarkAdapter', () => {
     it('isDM returns false for unknown threads', () => {
       const threadId = adapter.encodeThreadId({ chatId: 'oc_group1' })
       expect(adapter.isDM(threadId)).toBe(false)
+    })
+
+    it('isDM returns true after receiving a p2p message', async () => {
+      const dmAdapter = makeAdapter()
+      const dmMockChat = await initAdapter(dmAdapter)
+
+      const event = makeDMEvent()
+      await dmAdapter.handleWebhook(makeRequest(event))
+
+      // Execute the factory to trigger cache write
+      const factory = dmMockChat.processMessage.mock.calls[0]![2]
+      await (factory as () => Promise<unknown>)()
+
+      const threadId = dmAdapter.encodeThreadId({ chatId: 'oc_dm001' })
+      expect(dmAdapter.isDM(threadId)).toBe(true)
+    })
+
+    it('fetchThread populates channel cache for isDM', async () => {
+      server.use(
+        http.get(`${BASE}/open-apis/im/v1/chats/:chatId`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: { chat_mode: 'p2p', chat_type: 'p2p', name: 'DM Chat' },
+          }),
+        ),
+      )
+
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_dm001' })
+      await adapter.fetchThread(threadId)
+      expect(adapter.isDM(threadId)).toBe(true)
     })
   })
 
