@@ -201,6 +201,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   private readonly dedup = new DedupCache(DEDUP_CAPACITY)
   private readonly dispatcher: EventDispatcher
   private readonly dmCache = new Set<string>()
+  private pendingWebhookOptions?: WebhookOptions
 
   get userName(): string {
     return this.resolvedUserName
@@ -280,7 +281,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     if (body['type'] === 'url_verification') {
       return this.handleChallenge(request)
     }
-    return this.handleEvent(body, request, options)
+    return this.handleEvent(body, options)
   }
 
   // -- Message parsing --
@@ -546,7 +547,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       return
     }
     const message = this.parseMessage(data)
-    this.chat.processMessage(this, message.threadId, message, {})
+    this.chat.processMessage(this, message.threadId, message, this.pendingWebhookOptions)
   }
 
   private handleReactionEvent(
@@ -557,22 +558,25 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       return
     }
     const emojiType = data.reaction_type?.emoji_type ?? ''
-    this.chat.processReaction({
-      adapter: this,
-      added,
-      emoji: { name: emojiType, toJSON: () => '', toString: () => '' },
-      messageId: data.message_id,
-      raw: data,
-      rawEmoji: emojiType,
-      threadId: '',
-      user: {
-        fullName: '',
-        isBot: 'unknown' as const,
-        isMe: false,
-        userId: data.user_id?.open_id ?? '',
-        userName: '',
+    this.chat.processReaction(
+      {
+        adapter: this,
+        added,
+        emoji: { name: emojiType, toJSON: () => '', toString: () => '' },
+        messageId: data.message_id,
+        raw: data,
+        rawEmoji: emojiType,
+        threadId: '',
+        user: {
+          fullName: '',
+          isBot: 'unknown' as const,
+          isMe: false,
+          userId: data.user_id?.open_id ?? '',
+          userName: '',
+        },
       },
-    })
+      this.pendingWebhookOptions,
+    )
   }
 
   private async parseWebhookBody(cloned: Request): Promise<LarkWebhookBody | null> {
@@ -588,7 +592,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return Response.json(result)
   }
 
-  private handleEvent(body: LarkWebhookBody, request: Request, options?: WebhookOptions): Response {
+  private handleEvent(body: LarkWebhookBody, options?: WebhookOptions): Response {
     const eventId = extractEventId(body)
     if (eventId && this.dedup.has(eventId)) {
       return new Response('ok', { status: HTTP_OK })
@@ -596,25 +600,24 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     if (eventId) {
       this.dedup.add(eventId)
     }
-    this.dispatchEvent(body, request, options)
+    this.dispatchEvent(body, options)
     return new Response('ok', { status: HTTP_OK })
   }
 
-  private dispatchEvent(body: LarkWebhookBody, request: Request, options?: WebhookOptions): void {
-    const bridgeRequest = new Request(request.url, {
-      body: JSON.stringify(body),
-      headers: request.headers,
-      method: request.method,
-    })
-    const promise = bridgeWebhook(bridgeRequest, this.dispatcher)
-    if (options?.waitUntil) {
-      options.waitUntil(promise)
-      return
-    }
+  private dispatchEvent(body: LarkWebhookBody, options?: WebhookOptions): void {
+    // Store options so EventDispatcher callbacks can pass them to
+    // processMessage/processReaction — the SDK handles waitUntil internally.
+    // Call invoke() directly (not bridgeWebhook) to keep handler execution
+    // synchronous — the handler runs at the first yield inside invoke,
+    // before pendingWebhookOptions is cleared.
+    this.pendingWebhookOptions = options
     // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- fire-and-forget: must not await to avoid blocking HTTP response
-    void promise.catch((err: unknown) => {
-      this.logger?.error?.('Event processing error', err)
-    })
+    void (this.dispatcher.invoke(body as Record<string, unknown>) as Promise<unknown>).catch(
+      (err: unknown) => {
+        this.logger?.error?.('Event processing error', err)
+      },
+    )
+    this.pendingWebhookOptions = undefined
   }
 
   private extractImageKey(uploadRes: { image_key?: string } | null): string {
