@@ -42,7 +42,7 @@ import { LarkFormatConverter } from './format-converter.ts'
 import { bridgeWebhook } from './event-bridge.ts'
 import { cardMapper } from './card-mapper.ts'
 import type { ModalInput } from './modal-mapper.ts'
-import { modalMapper } from './modal-mapper.ts'
+import { MODAL_MARKER, modalMapper } from './modal-mapper.ts'
 
 /** Extract the first parameter type of an event handler from the SDK's EventHandles. */
 type EventData<TKey extends keyof EventHandles> =
@@ -55,7 +55,6 @@ type CardImageNode = { children?: CardImageNode[]; imageUrl?: string; type?: str
 
 const ADAPTER_NAME = 'lark'
 const CARD_ACTION_EVENT_TYPE = 'card.action.trigger'
-const MODAL_MARKER = '1'
 const DEDUP_CAPACITY = 500
 const STREAM_ELEMENT_ID = 'stream_md'
 const INITIAL_SEQUENCE = 1
@@ -149,6 +148,14 @@ const unknownAuthor = () => ({
   isBot: 'unknown' as const,
   isMe: false,
   userId: '',
+  userName: '',
+})
+
+const minimalUser = (userId: string) => ({
+  fullName: '',
+  isBot: false as const,
+  isMe: false,
+  userId,
   userName: '',
 })
 
@@ -734,7 +741,6 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         values[key] = Array.isArray(val) ? JSON.stringify(val) : String(val)
       }
     }
-    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
 
     void this.chat
       .processModalSubmit(
@@ -743,7 +749,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
           callbackId,
           privateMetadata,
           raw: action,
-          user,
+          user: minimalUser(userId),
           values,
           viewId: messageId,
         },
@@ -773,10 +779,16 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     const callbackId = String(action.value?.['__callbackId'] ?? '')
     const contextId = action.value?.['__contextId'] as string | undefined
     const privateMetadata = action.value?.['__privateMetadata'] as string | undefined
-    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
 
     this.chat.processModalClose(
-      { adapter: this, callbackId, privateMetadata, raw: action, user, viewId: messageId },
+      {
+        adapter: this,
+        callbackId,
+        privateMetadata,
+        raw: action,
+        user: minimalUser(userId),
+        viewId: messageId,
+      },
       contextId,
       options,
     )
@@ -795,7 +807,6 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     const value = action.option ?? String(actionValue['action'] ?? '')
     const threadId = this.encodeThreadId({ chatId })
     const triggerId = `${chatId}:${messageId}`
-    const user = { fullName: '', isBot: false as const, isMe: false, userId, userName: '' }
 
     this.chat.processAction(
       {
@@ -805,7 +816,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         raw: action,
         threadId,
         triggerId,
-        user,
+        user: minimalUser(userId),
         value: value || undefined,
       },
       options,
@@ -835,20 +846,17 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       return
     }
 
-    if (response.action === 'update') {
+    if (response.action === 'update' || response.action === 'push') {
       const cardJson = modalMapper.modalToLarkCard(response.modal as ModalInput, contextId)
-      void this.api.patchCard(messageId, JSON.stringify(cardJson)).catch((err: unknown) => {
-        this.logger?.error?.('Failed to update modal card', err)
-      })
-      return
-    }
-
-    if (response.action === 'push') {
-      const cardJson = modalMapper.modalToLarkCard(response.modal as ModalInput, contextId)
-      const decoded: LarkThreadId = { chatId }
-      void this.sendCardMessage(decoded, cardJson).catch((err: unknown) => {
-        this.logger?.error?.('Failed to push modal card', err)
-      })
+      if (response.action === 'update') {
+        void this.api.patchCard(messageId, JSON.stringify(cardJson)).catch((err: unknown) => {
+          this.logger?.error?.('Failed to update modal card', err)
+        })
+      } else {
+        void this.sendCardMessage({ chatId }, cardJson).catch((err: unknown) => {
+          this.logger?.error?.('Failed to push modal card', err)
+        })
+      }
     }
   }
 

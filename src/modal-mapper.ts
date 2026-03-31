@@ -235,5 +235,5 @@ const modalToLarkCard = (
 
 const modalMapper = { modalToLarkCard, resetIdCounter }
 
-export { modalMapper }
+export { MODAL_MARKER, modalMapper }
 export type { ModalInput }
