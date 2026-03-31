@@ -2,6 +2,7 @@ import type {
   Adapter,
   AdapterPostableMessage,
   ChannelInfo,
+  ChannelVisibility,
   ChatInstance,
   EmojiValue,
   EphemeralMessage,
@@ -12,6 +13,7 @@ import type {
   Logger,
   RawMessage,
   StreamChunk,
+  StreamOptions,
   ThreadInfo,
   WebhookOptions,
 } from 'chat'
@@ -165,6 +167,16 @@ const MIME_TO_LARK_FILE_TYPE: Record<string, LarkFileType> = {
 
 const mimeToLarkFileType = (mime: string): LarkFileType => MIME_TO_LARK_FILE_TYPE[mime] ?? 'stream'
 
+const mapChatTypeToVisibility = (chatType: string | undefined): ChannelVisibility => {
+  if (chatType === 'public') {
+    return 'workspace'
+  }
+  if (chatType === 'private') {
+    return 'private'
+  }
+  return 'unknown'
+}
+
 const parseMemberCount = (
   data: { bot_count?: string; user_count?: string } | undefined,
 ): number | undefined => {
@@ -177,6 +189,7 @@ const parseMemberCount = (
 
 export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   readonly name = ADAPTER_NAME
+  botUserId = ''
 
   private chat!: ChatInstance
   private logger!: Logger
@@ -217,6 +230,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     )
     const info = await this.api.getBotInfo()
     this.botOpenId = info.bot?.open_id ?? ''
+    this.botUserId = this.botOpenId
     if (info.bot?.app_name && !this.config.userName) {
       this.resolvedUserName = info.bot.app_name
     }
@@ -370,6 +384,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     return {
       channelId: chatId,
       channelName: res.data?.name,
+      channelVisibility: mapChatTypeToVisibility(res.data?.chat_type),
       id: threadId,
       isDM: res.data?.chat_mode === 'p2p',
       metadata: { raw: res },
@@ -388,12 +403,53 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   async fetchChannelInfo(channelId: string): Promise<ChannelInfo> {
     const res = await this.api.getChatInfo(channelId)
     return {
+      channelVisibility: mapChatTypeToVisibility(res.data?.chat_type),
       id: channelId,
       isDM: res.data?.chat_mode === 'p2p',
       memberCount: parseMemberCount(res.data),
       metadata: { raw: res },
       name: res.data?.name,
     }
+  }
+
+  async fetchChannelMessages(
+    channelId: string,
+    options?: FetchOptions,
+  ): Promise<FetchResult<LarkRaw>> {
+    const res = await this.api.listMessages(channelId, options?.cursor, options?.limit)
+    const items = res.data?.items ?? []
+    const threadId = this.encodeThreadId({ chatId: channelId })
+    const messages = items.map((item) => this.itemToMessage(item, threadId))
+    return {
+      messages,
+      nextCursor: (res.data?.has_more && res.data.page_token) || undefined,
+    }
+  }
+
+  async postChannelMessage(
+    channelId: string,
+    message: AdapterPostableMessage,
+  ): Promise<RawMessage<LarkRaw>> {
+    const decoded: LarkThreadId = { chatId: channelId }
+    const files = extractFiles(message)
+    const fileResults = await Promise.all(
+      files.map((file) => this.uploadAndSendFile(decoded, file)),
+    )
+    const lastFileResult = fileResults.at(LAST_INDEX) ?? null
+    const textResult = await this.sendMessageContent(decoded, message)
+    const result = lastFileResult ?? textResult
+    const raw: LarkMessageItem = { message_id: result.data?.message_id }
+    const threadId = this.encodeThreadId(decoded)
+    return { id: raw.message_id ?? '', raw, threadId }
+  }
+
+  getChannelVisibility(threadId: string): ChannelVisibility {
+    // Lark requires an API call for chat_type; fetchChannelInfo provides full visibility.
+    const { chatId } = this.decodeThreadId(threadId)
+    if (this.dmCache.has(chatId)) {
+      return 'private'
+    }
+    return 'unknown'
   }
 
   // -- DM --
@@ -424,6 +480,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   async stream(
     threadId: string,
     textStream: AsyncIterable<string | StreamChunk>,
+    _options?: StreamOptions,
   ): Promise<RawMessage<LarkRaw>> {
     const { cardId, messageId } = await this.createStreamingCard(this.decodeThreadId(threadId))
     let sequence = INITIAL_SEQUENCE

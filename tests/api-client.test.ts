@@ -151,15 +151,65 @@ describe('LarkApiClient', () => {
     expect(result).toMatchObject({ bot: { app_name: 'TestBot', open_id: 'ou_bot1' } })
   })
 
-  it('429 response → throws AdapterRateLimitError', async () => {
-    server.use(
-      tokenHandler,
-      http.post(`${BASE}/open-apis/im/v1/messages`, () => new HttpResponse(null, { status: 429 })),
-    )
+  describe('error mapping', () => {
+    it('429 response → AdapterRateLimitError', async () => {
+      server.use(
+        tokenHandler,
+        http.post(
+          `${BASE}/open-apis/im/v1/messages`,
+          () => new HttpResponse(null, { status: 429 }),
+        ),
+      )
 
-    const client = makeClient()
-    await expect(client.sendMessage('oc_chat1', 'text', '{"text":"hi"}')).rejects.toMatchObject({
-      name: 'AdapterRateLimitError',
+      const client = makeClient()
+      await expect(client.sendMessage('oc_chat1', 'text', '{"text":"hi"}')).rejects.toMatchObject({
+        name: 'AdapterRateLimitError',
+      })
+    })
+
+    it('401 response → AuthenticationError', async () => {
+      server.use(
+        tokenHandler,
+        http.post(
+          `${BASE}/open-apis/im/v1/messages`,
+          () => new HttpResponse(null, { status: 401 }),
+        ),
+      )
+
+      const client = makeClient()
+      await expect(client.sendMessage('oc_chat1', 'text', '{"text":"hi"}')).rejects.toMatchObject({
+        name: 'AuthenticationError',
+      })
+    })
+
+    it('403 response → PermissionError', async () => {
+      server.use(
+        tokenHandler,
+        http.post(
+          `${BASE}/open-apis/im/v1/messages`,
+          () => new HttpResponse(null, { status: 403 }),
+        ),
+      )
+
+      const client = makeClient()
+      await expect(client.sendMessage('oc_chat1', 'text', '{"text":"hi"}')).rejects.toMatchObject({
+        name: 'PermissionError',
+      })
+    })
+
+    it('404 response → ResourceNotFoundError', async () => {
+      server.use(
+        tokenHandler,
+        http.get(
+          `${BASE}/open-apis/im/v1/messages/:id`,
+          () => new HttpResponse(null, { status: 404 }),
+        ),
+      )
+
+      const client = makeClient()
+      await expect(client.getMessage('om_missing')).rejects.toMatchObject({
+        name: 'ResourceNotFoundError',
+      })
     })
   })
 

@@ -15,6 +15,7 @@ const HTTP_OK = 200
 const HTTP_BAD_REQUEST = 400
 const ONCE = 1
 const ONE_MESSAGE = 1
+const FIRST_MESSAGE = 0
 const STREAM_CHUNK_COUNT = 3
 const MEMBER_COUNT_42 = 42
 const SEQ_1 = 1
@@ -672,15 +673,10 @@ describe('LarkAdapter', () => {
     })
   })
 
-  describe('ephemeral', () => {
-    let adapter: LarkAdapter = undefined!
-
-    beforeEach(async () => {
-      adapter = makeAdapter()
-      await initAdapter(adapter)
-    })
-
+  describe('channel, visibility, and ephemeral', () => {
     it('postEphemeral sends to correct user', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
       let captured: unknown = undefined
       server.use(
         tokenHandler,
@@ -693,6 +689,112 @@ describe('LarkAdapter', () => {
       const result = await adapter.postEphemeral(threadId, 'ou_user1', 'secret msg')
       expect(captured).toMatchObject({ chat_id: 'oc_chat001', open_id: 'ou_user1' })
       expect(result.usedFallback).toBe(false)
+    })
+
+    it('botUserId is set from bot info after initialization', async () => {
+      const adapter = makeAdapter()
+      expect(adapter.botUserId).toBe('')
+      await initAdapter(adapter)
+      expect(adapter.botUserId).toBe('ou_bot001')
+    })
+
+    it('postChannelMessage sends to channel by chatId', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      let captured: unknown = undefined
+      server.use(
+        tokenHandler,
+        http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
+          captured = await request.json()
+          return HttpResponse.json({ code: 0, data: { message_id: 'om_ch_msg' } })
+        }),
+      )
+
+      const result = await adapter.postChannelMessage('oc_chat001', 'hello channel')
+      expect(captured).toMatchObject({ receive_id: 'oc_chat001' })
+      expect(result.id).toBe('om_ch_msg')
+    })
+
+    it('fetchChannelMessages fetches by channelId with pagination', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/messages`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              has_more: true,
+              items: [
+                {
+                  body: { content: '{"text":"ch msg"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_ch1',
+                },
+              ],
+              page_token: 'next',
+            },
+          }),
+        ),
+      )
+
+      const result = await adapter.fetchChannelMessages('oc_chat001')
+      expect(result.messages).toHaveLength(ONE_MESSAGE)
+      expect(result.messages.at(FIRST_MESSAGE)!.text).toBe('ch msg')
+      expect(result.nextCursor).toBe('next')
+    })
+
+    it('getChannelVisibility returns private for known DM channels', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.post(`${BASE}/open-apis/im/v1/chats`, () =>
+          HttpResponse.json({ code: 0, data: { chat_id: 'oc_dm' } }),
+        ),
+      )
+      await adapter.openDM('ou_user1')
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_dm' })
+      expect(adapter.getChannelVisibility(threadId)).toBe('private')
+    })
+
+    it('getChannelVisibility returns unknown without cached info', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_unknown' })
+      expect(adapter.getChannelVisibility(threadId)).toBe('unknown')
+    })
+
+    it('fetchChannelInfo returns workspace for public chats', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/chats/:chatId`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: { chat_mode: 'group', chat_type: 'public', name: 'Public' },
+          }),
+        ),
+      )
+      const info = await adapter.fetchChannelInfo('oc_pub')
+      expect(info.channelVisibility).toBe('workspace')
+    })
+
+    it('fetchChannelInfo returns private for private chats', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/chats/:chatId`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: { chat_mode: 'group', chat_type: 'private', name: 'Private' },
+          }),
+        ),
+      )
+      const info = await adapter.fetchChannelInfo('oc_priv')
+      expect(info.channelVisibility).toBe('private')
     })
   })
 })

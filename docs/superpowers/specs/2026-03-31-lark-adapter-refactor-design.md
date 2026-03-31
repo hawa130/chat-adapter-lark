@@ -108,14 +108,14 @@ export function createLarkTestContext(handlers) {
 
 Cover all flows required by testing.mdx:
 
-| Flow | What to verify |
-|------|----------------|
-| Mention | Bot detects @mention, `onNewMention` fires |
-| Subscribe + follow-up | After `thread.subscribe()`, subsequent messages trigger `onSubscribedMessage` |
-| Self-message filtering | Messages from bot itself are ignored |
-| DM flow | Direct messages detected and routed correctly |
-| Reactions | Emoji reactions fire `onReaction` with correct emoji and message ID |
-| Rate limit | API 429 → `AdapterRateLimitError` propagates correctly |
+| Flow                   | What to verify                                                                |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| Mention                | Bot detects @mention, `onNewMention` fires                                    |
+| Subscribe + follow-up  | After `thread.subscribe()`, subsequent messages trigger `onSubscribedMessage` |
+| Self-message filtering | Messages from bot itself are ignored                                          |
+| DM flow                | Direct messages detected and routed correctly                                 |
+| Reactions              | Emoji reactions fire `onReaction` with correct emoji and message ID           |
+| Rate limit             | API 429 → `AdapterRateLimitError` propagates correctly                        |
 
 MSW handlers remain for mocking Lark API responses. The real `Chat` + `createMemoryState()` handles SDK routing.
 
@@ -124,6 +124,7 @@ MSW handlers remain for mocking Lark API responses. The real `Chat` + `createMem
 #### 3.1 Error mapping tests (api-client.test.ts)
 
 Add tests for:
+
 - HTTP 403 → `PermissionError`
 - HTTP 404 → `ResourceNotFoundError`
 - HTTP 401 → `AuthenticationError`
@@ -138,23 +139,23 @@ Add tests for:
 
 ## Out of scope
 
-| Item | Reason |
-|------|--------|
-| `scheduleMessage()` | Lark has no scheduled message API |
-| `listThreads()` | Lark has no thread listing API |
-| `onThreadSubscribe()` | Lark has no thread subscription mechanism |
-| `lockScope` property | Default `"thread"` is correct for Lark |
-| `persistMessageHistory` | Lark has server-side message history |
-| Use `cardToFallbackText` from shared | `PlatformName` excludes `"lark"` |
-| Use `mapButtonStyle` from shared | `PlatformName` excludes `"lark"` |
+| Item                                 | Reason                                    |
+| ------------------------------------ | ----------------------------------------- |
+| `scheduleMessage()`                  | Lark has no scheduled message API         |
+| `listThreads()`                      | Lark has no thread listing API            |
+| `onThreadSubscribe()`                | Lark has no thread subscription mechanism |
+| `lockScope` property                 | Default `"thread"` is correct for Lark    |
+| `persistMessageHistory`              | Lark has server-side message history      |
+| Use `cardToFallbackText` from shared | `PlatformName` excludes `"lark"`          |
+| Use `mapButtonStyle` from shared     | `PlatformName` excludes `"lark"`          |
 
 ## File changes
 
-| File | Action |
-|------|--------|
-| `src/adapter.ts` | Add `botUserId`, `postChannelMessage`, `fetchChannelMessages`, `getChannelVisibility`; update `stream` signature |
-| `tests/test-utils.ts` | New: `createLarkTestContext` factory |
-| `tests/integration.test.ts` | Rewrite using real `Chat` + `createMemoryState()` |
-| `tests/api-client.test.ts` | Add error mapping tests |
-| `tests/adapter.test.ts` | Add new method tests |
-| `package.json` | Add `@chat-adapter/state-memory` devDependency |
+| File                        | Action                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `src/adapter.ts`            | Add `botUserId`, `postChannelMessage`, `fetchChannelMessages`, `getChannelVisibility`; update `stream` signature |
+| `tests/test-utils.ts`       | New: `createLarkTestContext` factory                                                                             |
+| `tests/integration.test.ts` | Rewrite using real `Chat` + `createMemoryState()`                                                                |
+| `tests/api-client.test.ts`  | Add error mapping tests                                                                                          |
+| `tests/adapter.test.ts`     | Add new method tests                                                                                             |
+| `package.json`              | Add `@chat-adapter/state-memory` devDependency                                                                   |

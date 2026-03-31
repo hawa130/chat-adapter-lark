@@ -9,6 +9,7 @@
         "@larksuiteoapi/node-sdk": "^1.60.0",
       },
       "devDependencies": {
+        "@chat-adapter/state-memory": "^4.23.0",
         "@types/bun": "latest",
         "@types/mdast": "^4.0.0",
         "@vitest/coverage-v8": "^4.0.0",
@@ -40,6 +41,8 @@
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
     "@chat-adapter/shared": ["@chat-adapter/shared@4.23.0", "", { "dependencies": { "chat": "4.23.0" } }, "sha512-IDHgrAi3Y8Qptl1kd8zmM6jxWX+lu0cq/uZiURv8jONufWHrVwVr19pN0YK52ASnRlLZkcaNYXoa+mLFGQ2tlw=="],
+
+    "@chat-adapter/state-memory": ["@chat-adapter/state-memory@4.23.0", "", { "dependencies": { "chat": "4.23.0" } }, "sha512-IlAVV4MGpjdassiI4haNAzWdFl66xFAfqM5DnWAGZdndkQj0LNMigcxhOgyS++yQUUWWvT1yRKwCswenCvxWVw=="],
 
     "@emnapi/core": ["@emnapi/core@1.9.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.0", "tslib": "^2.4.0" } }, "sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA=="],
 
