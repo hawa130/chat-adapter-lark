@@ -20,8 +20,6 @@ const HTTP_UNAUTHORIZED = 401
 const HTTP_FORBIDDEN = 403
 const HTTP_NOT_FOUND = 404
 const LARK_RATE_LIMIT_CODE = 99991400
-const LARK_INVALID_ACCESS_TOKEN = 99991663
-const LARK_INVALID_TOKEN_FORMAT = 99991671
 const DEFAULT_PAGE_SIZE = 20
 
 const extractStatus = (err: LarkSdkError): number | undefined =>
@@ -29,22 +27,14 @@ const extractStatus = (err: LarkSdkError): number | undefined =>
 
 const extractCode = (err: LarkSdkError): number | undefined => err.code ?? err.response?.data?.code
 
-const isRateLimit = (status: number | undefined, code: number | undefined): boolean =>
-  status === HTTP_RATE_LIMIT || code === LARK_RATE_LIMIT_CODE
-
-const isAuthError = (status: number | undefined, code: number | undefined): boolean =>
-  status === HTTP_UNAUTHORIZED ||
-  code === LARK_INVALID_ACCESS_TOKEN ||
-  code === LARK_INVALID_TOKEN_FORMAT
-
 const matchLarkError = (
   status: number | undefined,
   code: number | undefined,
 ): Error | undefined => {
-  if (isRateLimit(status, code)) {
+  if (status === HTTP_RATE_LIMIT || code === LARK_RATE_LIMIT_CODE) {
     return new AdapterRateLimitError(ADAPTER_NAME)
   }
-  if (isAuthError(status, code)) {
+  if (status === HTTP_UNAUTHORIZED) {
     return new AuthenticationError(ADAPTER_NAME)
   }
   if (status === HTTP_FORBIDDEN) {
