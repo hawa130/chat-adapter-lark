@@ -74,6 +74,7 @@ app.post('/webhook/lark', async (req, res) => {
    - `im.message.receive_v1` — Receive messages
    - `im.message.reaction.created_v1` — Reaction added
    - `im.message.reaction.deleted_v1` — Reaction removed
+   - `card.action.trigger` — Card button/form interactions
 
 ### 3. Add permissions
 
@@ -150,16 +151,16 @@ LARK_DOMAIN=feishu               # Optional, "feishu" (default) or "lark"
 
 ### Rich content
 
-| Feature         | Supported         |
-| --------------- | ----------------- |
-| Card format     | Interactive Cards |
-| Buttons         | Yes               |
-| Link buttons    | Yes               |
-| Select menus    | Yes               |
-| Tables          | Yes               |
-| Fields          | Yes               |
-| Images in cards | Yes               |
-| Modals          | No                |
+| Feature         | Supported                              |
+| --------------- | -------------------------------------- |
+| Card format     | Interactive Cards                      |
+| Buttons         | Yes                                    |
+| Link buttons    | Yes                                    |
+| Select menus    | Yes                                    |
+| Tables          | Yes                                    |
+| Fields          | Yes                                    |
+| Images in cards | Yes                                    |
+| Modals          | Yes (emulated via form container card) |
 
 ### Conversations
 
@@ -179,10 +180,10 @@ LARK_DOMAIN=feishu               # Optional, "feishu" (default) or "lark"
 | Fetch messages         | Yes       |
 | Fetch single message   | Yes       |
 | Fetch thread info      | Yes       |
-| Fetch channel messages | No        |
+| Fetch channel messages | Yes       |
 | List threads           | No        |
 | Fetch channel info     | Yes       |
-| Post channel message   | No        |
+| Post channel message   | Yes       |
 
 ## Troubleshooting
 
