@@ -1,5 +1,6 @@
 import { customAlphabet } from 'nanoid'
 import type {
+  CardChild,
   LarkBehavior,
   LarkButtonElement,
   LarkCardBody,
@@ -12,29 +13,6 @@ import type {
   LarkSelectElement,
   LarkTableElement,
 } from './types.ts'
-
-/** Minimal shapes for card elements (JSX components, not importable as types). */
-interface CardChild {
-  align?: string[]
-  alt?: string
-  children?: CardChild[]
-  content?: string
-  disabled?: boolean
-  headers?: string[]
-  id?: string
-  imageUrl?: string
-  initialOption?: string
-  label?: string
-  options?: CardChild[]
-  placeholder?: string
-  rows?: string[][]
-  style?: string
-  subtitle?: string
-  title?: string
-  type: string
-  url?: string
-  value?: unknown
-}
 
 const NANO_ID_SIZE = 12
 const MIN_PAGE_SIZE = 1

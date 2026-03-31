@@ -101,6 +101,33 @@ type LarkRaw = LarkRawMessage | LarkMessageItem
 type LarkFileType = 'doc' | 'mp4' | 'opus' | 'pdf' | 'ppt' | 'stream' | 'xls'
 
 // ---------------------------------------------------------------------------
+// Card child (Chat SDK input shape)
+// ---------------------------------------------------------------------------
+
+/** Minimal shapes for card elements (JSX components, not importable as types). */
+interface CardChild {
+  align?: string[]
+  alt?: string
+  children?: CardChild[]
+  content?: string
+  disabled?: boolean
+  headers?: string[]
+  id?: string
+  imageUrl?: string
+  initialOption?: string
+  label?: string
+  options?: CardChild[]
+  placeholder?: string
+  rows?: string[][]
+  style?: string
+  subtitle?: string
+  title?: string
+  type: string
+  url?: string
+  value?: unknown
+}
+
+// ---------------------------------------------------------------------------
 // Card JSON 2.0 types (based on official Lark card component docs)
 // ---------------------------------------------------------------------------
 
@@ -251,6 +278,7 @@ interface LarkSdkError {
 // ---------------------------------------------------------------------------
 
 export type {
+  CardChild,
   CardKitCard,
   LarkAdapterConfig,
   LarkBehavior,

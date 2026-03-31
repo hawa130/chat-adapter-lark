@@ -256,7 +256,7 @@ export default class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   // -- Webhook handling --
 
   async handleWebhook(request: Request, options?: WebhookOptions): Promise<Response> {
-    const body = await this.parseWebhookBody(request.clone())
+    const body = await this.parseWebhookBody(request.clone() as Request)
     if (!body) {
       return new Response('Invalid JSON', { status: HTTP_BAD_REQUEST })
     }

@@ -232,7 +232,7 @@ describe('LarkAdapter', () => {
 
   // -- 7C: Message parsing --
   describe('parseMessage', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -320,7 +320,7 @@ describe('LarkAdapter', () => {
 
   // -- 7D: Message sending --
   describe('message sending', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -410,7 +410,7 @@ describe('LarkAdapter', () => {
 
   // -- 7E: Reactions --
   describe('reactions', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -471,7 +471,7 @@ describe('LarkAdapter', () => {
 
   // -- 7F: Fetch methods --
   describe('fetch methods', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -561,7 +561,7 @@ describe('LarkAdapter', () => {
 
   // -- 7F: DM --
   describe('DM', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -609,7 +609,7 @@ describe('LarkAdapter', () => {
 
   // -- 7G: Streaming --
   describe('stream', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()
@@ -645,7 +645,7 @@ describe('LarkAdapter', () => {
 
       expect(result.id).toBe('om_stream1')
       expect(streamUpdates).toHaveLength(STREAM_CHUNK_COUNT)
-      expect(streamUpdates[streamUpdates.length - ONCE].content).toBe('Hello World!')
+      expect(streamUpdates[streamUpdates.length - ONCE]!.content).toBe('Hello World!')
       expect(streamUpdates.map((item) => item.sequence)).toEqual([SEQ_1, SEQ_2, SEQ_3])
       expect(settingsCaptured).toMatchObject({
         settings: expect.stringContaining('streaming_mode'),
@@ -683,7 +683,7 @@ describe('LarkAdapter', () => {
 
   // -- 7H: Ephemeral --
   describe('ephemeral', () => {
-    let adapter = undefined!
+    let adapter: LarkAdapter = undefined!
 
     beforeEach(async () => {
       adapter = makeAdapter()

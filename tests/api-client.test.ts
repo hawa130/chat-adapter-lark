@@ -127,10 +127,10 @@ describe('LarkApiClient', () => {
     const client = makeClient()
     const result = await client.listMessages('oc_chat1', 'tok_abc', pageSize)
 
-    expect(capturedParams?.get('container_id')).toBe('oc_chat1')
-    expect(capturedParams?.get('container_id_type')).toBe('chat')
-    expect(capturedParams?.get('page_token')).toBe('tok_abc')
-    expect(capturedParams?.get('page_size')).toBe(String(pageSize))
+    expect(capturedParams!.get('container_id')).toBe('oc_chat1')
+    expect(capturedParams!.get('container_id_type')).toBe('chat')
+    expect(capturedParams!.get('page_token')).toBe('tok_abc')
+    expect(capturedParams!.get('page_size')).toBe(String(pageSize))
     expect(result).toMatchObject({ data: { has_more: true } })
   })
 

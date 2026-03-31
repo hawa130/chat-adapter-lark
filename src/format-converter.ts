@@ -1,6 +1,11 @@
 import { BaseFormatConverter, parseMarkdown, stringifyMarkdown } from 'chat'
 import type { Root } from 'mdast'
-import type { LarkInteractiveContent, LarkMessageContent, LarkPostContent } from './types.ts'
+import type {
+  CardChild,
+  LarkInteractiveContent,
+  LarkMessageContent,
+  LarkPostContent,
+} from './types.ts'
 import cardMapper from './card-mapper.ts'
 
 type PostLang = { content?: PostInlineTag[][]; title?: string }
