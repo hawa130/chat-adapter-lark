@@ -58,6 +58,12 @@ type ParsedCardActionEvent = NonNullable<LarkCardActionBody['event']>
 type RequestParser = {
   parse: (data: Record<string, unknown>) => Record<string, unknown>
 }
+type ChannelCacheEntry = {
+  chatMode?: string
+  chatType?: string
+  external?: boolean
+  name?: string
+}
 
 /** Recursive node shape for traversing card trees to upload images. */
 type CardImageNode = { children?: CardImageNode[]; imageUrl?: string; type?: string; url?: string }
@@ -200,11 +206,18 @@ const streamToBuffer = async (stream: Readable): Promise<Buffer> => {
   return Buffer.concat(chunks)
 }
 
-const mapChatTypeToVisibility = (chatType: string | undefined): ChannelVisibility => {
+const mapChannelVisibility = ({
+  chatMode,
+  chatType,
+  external,
+}: ChannelCacheEntry): ChannelVisibility => {
+  if (external === true) {
+    return 'external'
+  }
   if (chatType === 'public') {
     return 'workspace'
   }
-  if (chatType === 'private') {
+  if (chatMode === 'p2p' || chatType === 'private') {
     return 'private'
   }
   return 'unknown'
@@ -213,23 +226,21 @@ const mapChatTypeToVisibility = (chatType: string | undefined): ChannelVisibilit
 const parseMemberCount = (
   data: { bot_count?: string; user_count?: string } | undefined,
 ): number | undefined => {
-  const count = Number(data?.user_count)
-  if (Number.isFinite(count)) {
-    return count
+  const userCount = Number(data?.user_count)
+  const botCount = Number(data?.bot_count)
+  if (Number.isFinite(userCount) || Number.isFinite(botCount)) {
+    return (Number.isFinite(userCount) ? userCount : 0) + (Number.isFinite(botCount) ? botCount : 0)
   }
   return undefined
 }
 
 type LarkSortType = 'ByCreateTimeAsc' | 'ByCreateTimeDesc'
 
-const directionToSortType = (direction?: string): LarkSortType | undefined => {
+const directionToSortType = (direction?: string): LarkSortType => {
   if (direction === 'forward') {
     return 'ByCreateTimeAsc'
   }
-  if (direction === 'backward') {
-    return 'ByCreateTimeDesc'
-  }
-  return undefined
+  return 'ByCreateTimeDesc'
 }
 
 const USER_CACHE_TTL_MS = 8 * 24 * 60 * 60 * 1000
@@ -249,7 +260,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   private api!: LarkApiClient
   private readonly converter = new LarkFormatConverter()
   private readonly webhookParser: EventDispatcher
-  private readonly channelTypeMap = new Map<string, string>()
+  private readonly channelTypeMap = new Map<string, ChannelCacheEntry>()
   private readonly userNameCache = new Map<string, string>()
 
   get userName(): string {
@@ -443,7 +454,10 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     const { chatId } = this.decodeThreadId(threadId)
     const sortType = directionToSortType(options?.direction)
     const res = await this.api.listMessages(chatId, options?.cursor, options?.limit, sortType)
-    const items = res.data?.items ?? []
+    const items =
+      sortType === 'ByCreateTimeDesc'
+        ? [...(res.data?.items ?? [])].reverse()
+        : (res.data?.items ?? [])
     const messages = await Promise.all(items.map((item) => this.itemToMessage(item, threadId)))
     return {
       messages,
@@ -454,16 +468,19 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   async fetchThread(threadId: string): Promise<ThreadInfo> {
     const { chatId } = this.decodeThreadId(threadId)
     const res = await this.api.getChatInfo(chatId)
-    const chatType = res.data?.chat_mode ?? res.data?.chat_type
-    if (chatType) {
-      this.cacheChannelType(chatId, chatType, res.data?.name)
-    }
+    this.cacheChannelType(chatId, {
+      chatMode: res.data?.chat_mode,
+      chatType: res.data?.chat_type,
+      external: res.data?.external === true,
+      name: res.data?.name,
+    })
+    const channel = this.channelTypeMap.get(chatId) ?? {}
     return {
       channelId: chatId,
       channelName: res.data?.name,
-      channelVisibility: mapChatTypeToVisibility(res.data?.chat_type),
+      channelVisibility: mapChannelVisibility(channel),
       id: threadId,
-      isDM: chatType === 'p2p',
+      isDM: channel.chatMode === 'p2p',
       metadata: { raw: res },
     }
   }
@@ -479,14 +496,17 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   async fetchChannelInfo(channelId: string): Promise<ChannelInfo> {
     const res = await this.api.getChatInfo(channelId)
-    const chatType = res.data?.chat_mode ?? res.data?.chat_type
-    if (chatType) {
-      this.cacheChannelType(channelId, chatType, res.data?.name)
-    }
+    this.cacheChannelType(channelId, {
+      chatMode: res.data?.chat_mode,
+      chatType: res.data?.chat_type,
+      external: res.data?.external === true,
+      name: res.data?.name,
+    })
+    const channel = this.channelTypeMap.get(channelId) ?? {}
     return {
-      channelVisibility: mapChatTypeToVisibility(res.data?.chat_type),
+      channelVisibility: mapChannelVisibility(channel),
       id: channelId,
-      isDM: chatType === 'p2p',
+      isDM: channel.chatMode === 'p2p',
       memberCount: parseMemberCount(res.data),
       metadata: { raw: res },
       name: res.data?.name,
@@ -499,7 +519,10 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   ): Promise<FetchResult<LarkRaw>> {
     const sortType = directionToSortType(options?.direction)
     const res = await this.api.listMessages(channelId, options?.cursor, options?.limit, sortType)
-    const items = res.data?.items ?? []
+    const items =
+      sortType === 'ByCreateTimeDesc'
+        ? [...(res.data?.items ?? [])].reverse()
+        : (res.data?.items ?? [])
     const threadId = this.encodeThreadId({ chatId: channelId })
     const messages = await Promise.all(items.map((item) => this.itemToMessage(item, threadId)))
     return {
@@ -527,9 +550,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   getChannelVisibility(threadId: string): ChannelVisibility {
     const { chatId } = this.decodeThreadId(threadId)
-    const chatType = this.channelTypeMap.get(chatId)
-    if (chatType === 'p2p') return 'private'
-    return 'unknown'
+    return mapChannelVisibility(this.channelTypeMap.get(chatId) ?? {})
   }
 
   // -- DM --
@@ -537,13 +558,13 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
   async openDM(userId: string): Promise<string> {
     const res = await this.api.createP2PChat(userId)
     const chatId = res.data?.chat_id ?? ''
-    this.cacheChannelType(chatId, 'p2p')
+    this.cacheChannelType(chatId, { chatMode: 'p2p' })
     return this.encodeThreadId({ chatId })
   }
 
   isDM(threadId: string): boolean {
     const { chatId } = this.decodeThreadId(threadId)
-    return this.channelTypeMap.get(chatId) === 'p2p'
+    return this.channelTypeMap.get(chatId)?.chatMode === 'p2p'
   }
 
   // -- Misc --
@@ -701,10 +722,11 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     }
   }
 
-  private cacheChannelType(chatId: string, chatType: string, name?: string): void {
-    this.channelTypeMap.set(chatId, chatType)
+  private cacheChannelType(chatId: string, entry: ChannelCacheEntry): void {
+    const next = { ...this.channelTypeMap.get(chatId), ...entry }
+    this.channelTypeMap.set(chatId, next)
     const state = this.chat.getState()
-    void state.set(`lark:channel:${chatId}`, { name, chatType }, CHANNEL_CACHE_TTL_MS)
+    void state.set(`lark:channel:${chatId}`, next, CHANNEL_CACHE_TTL_MS)
   }
 
   private async lookupUser(openId: string): Promise<string> {
@@ -785,7 +807,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
       // Cache channel type from event
       const chatType = msg.chat_type
       if (chatType) {
-        this.cacheChannelType(msg.chat_id, chatType)
+        this.cacheChannelType(msg.chat_id, { chatMode: chatType })
       }
 
       const openId = data.sender.sender_id?.open_id ?? ''

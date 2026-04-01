@@ -884,6 +884,40 @@ describe('LarkAdapter', () => {
       expect(result.nextCursor).toBe('next-tok')
     })
 
+    it('fetchMessages defaults to backward paging and returns chronological order', async () => {
+      let capturedUrl: URL | undefined
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/messages`, ({ request }) => {
+          capturedUrl = new URL(request.url)
+          return HttpResponse.json({
+            code: 0,
+            data: {
+              has_more: false,
+              items: [
+                {
+                  body: { content: '{"text":"newest"}' },
+                  create_time: '1700000001000',
+                  message_id: 'om_new',
+                },
+                {
+                  body: { content: '{"text":"older"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_old',
+                },
+              ],
+            },
+          })
+        }),
+      )
+
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+      const result = await adapter.fetchMessages(threadId)
+
+      expect(capturedUrl?.searchParams.get('sort_type')).toBe('ByCreateTimeDesc')
+      expect(result.messages.map((message) => message.id)).toEqual(['om_old', 'om_new'])
+    })
+
     it('fetchMessages passes direction as sort_type', async () => {
       let capturedUrl: URL | undefined
       server.use(
@@ -899,6 +933,37 @@ describe('LarkAdapter', () => {
       const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
       await adapter.fetchMessages(threadId, { direction: 'backward' })
       expect(capturedUrl?.searchParams.get('sort_type')).toBe('ByCreateTimeDesc')
+    })
+
+    it('fetchMessages backward direction returns chronological order', async () => {
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/messages`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              has_more: false,
+              items: [
+                {
+                  body: { content: '{"text":"newest"}' },
+                  create_time: '1700000001000',
+                  message_id: 'om_new',
+                },
+                {
+                  body: { content: '{"text":"older"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_old',
+                },
+              ],
+            },
+          }),
+        ),
+      )
+
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+      const result = await adapter.fetchMessages(threadId, { direction: 'backward' })
+
+      expect(result.messages.map((message) => message.id)).toEqual(['om_old', 'om_new'])
     })
 
     it('fetchMessages forward direction maps to ByCreateTimeAsc', async () => {
@@ -1038,20 +1103,20 @@ describe('LarkAdapter', () => {
       expect(msg!.id).toBe('om_f1')
     })
 
-    it('fetchChannelInfo returns channel metadata with memberCount from user_count', async () => {
+    it('fetchChannelInfo returns channel metadata with memberCount from users and bots', async () => {
       server.use(
         tokenHandler,
         http.get(`${BASE}/open-apis/im/v1/chats/:id`, () =>
           HttpResponse.json({
             code: 0,
-            data: { chat_mode: 'group', name: 'Channel X', user_count: '42' },
+            data: { bot_count: '3', chat_mode: 'group', name: 'Channel X', user_count: '42' },
           }),
         ),
       )
       const info = await adapter.fetchChannelInfo('oc_chat001')
       expect(info.id).toBe('oc_chat001')
       expect(info.name).toBe('Channel X')
-      expect(info.memberCount).toBe(42)
+      expect(info.memberCount).toBe(45)
       expect(info.isDM).toBe(false)
     })
   })
@@ -1306,6 +1371,73 @@ describe('LarkAdapter', () => {
       expect(result.nextCursor).toBe('next')
     })
 
+    it('fetchChannelMessages defaults to backward paging and returns chronological order', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      let capturedUrl: URL | undefined
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/messages`, ({ request }) => {
+          capturedUrl = new URL(request.url)
+          return HttpResponse.json({
+            code: 0,
+            data: {
+              has_more: false,
+              items: [
+                {
+                  body: { content: '{"text":"newest"}' },
+                  create_time: '1700000001000',
+                  message_id: 'om_new',
+                },
+                {
+                  body: { content: '{"text":"older"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_old',
+                },
+              ],
+            },
+          })
+        }),
+      )
+
+      const result = await adapter.fetchChannelMessages('oc_chat001')
+
+      expect(capturedUrl?.searchParams.get('sort_type')).toBe('ByCreateTimeDesc')
+      expect(result.messages.map((message) => message.id)).toEqual(['om_old', 'om_new'])
+    })
+
+    it('fetchChannelMessages backward direction returns chronological order', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/messages`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              has_more: false,
+              items: [
+                {
+                  body: { content: '{"text":"newest"}' },
+                  create_time: '1700000001000',
+                  message_id: 'om_new',
+                },
+                {
+                  body: { content: '{"text":"older"}' },
+                  create_time: '1700000000000',
+                  message_id: 'om_old',
+                },
+              ],
+            },
+          }),
+        ),
+      )
+
+      const result = await adapter.fetchChannelMessages('oc_chat001', { direction: 'backward' })
+
+      expect(result.messages.map((message) => message.id)).toEqual(['om_old', 'om_new'])
+    })
+
     it('getChannelVisibility returns private for known DM channels', async () => {
       const adapter = makeAdapter()
       await initAdapter(adapter)
@@ -1341,6 +1473,9 @@ describe('LarkAdapter', () => {
       )
       const info = await adapter.fetchChannelInfo('oc_pub')
       expect(info.channelVisibility).toBe('workspace')
+      expect(adapter.getChannelVisibility(adapter.encodeThreadId({ chatId: 'oc_pub' }))).toBe(
+        'workspace',
+      )
     })
 
     it('fetchChannelInfo returns private for private chats', async () => {
@@ -1357,6 +1492,30 @@ describe('LarkAdapter', () => {
       )
       const info = await adapter.fetchChannelInfo('oc_priv')
       expect(info.channelVisibility).toBe('private')
+    })
+
+    it('fetchChannelInfo returns external visibility for external chats', async () => {
+      const adapter = makeAdapter()
+      await initAdapter(adapter)
+      server.use(
+        tokenHandler,
+        http.get(`${BASE}/open-apis/im/v1/chats/:chatId`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              chat_mode: 'group',
+              chat_type: 'public',
+              external: true,
+              name: 'External',
+            },
+          }),
+        ),
+      )
+      const info = await adapter.fetchChannelInfo('oc_ext')
+      expect(info.channelVisibility).toBe('external')
+      expect(adapter.getChannelVisibility(adapter.encodeThreadId({ chatId: 'oc_ext' }))).toBe(
+        'external',
+      )
     })
   })
 
