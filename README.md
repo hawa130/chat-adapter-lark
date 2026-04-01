@@ -100,7 +100,7 @@ Add the following scopes to your app. The table maps each permission to the adap
 
 > **Note:** `im:message:readonly` also covers reaction events (`im.message.reaction.created/deleted_v1`) and listing reactions, so no additional permission is needed for receiving reaction events.
 
-> **Note:** Lark supports broader permission coverage for some message APIs. For example, `im:message:send_as_bot` can cover sending, editing, deleting, and updating app-sent message cards where the API documentation lists permissions as "any one of".
+> **Note:** For the message APIs used by this adapter, `im:message:send_as_bot` is sufficient for send, edit, delete, and app-sent card updates where Lark marks permissions as "any one of".
 
 ### 4. Publish
 

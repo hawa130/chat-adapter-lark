@@ -54,6 +54,13 @@ Lower priority, implement as needed.
 - [ ] `setChatMenuTree` — `POST /im/v1/chat_menu_tree` (bot menu in group)
 - [ ] `setTopNotice` — `POST /im/v1/chats/:id/top_notice/put_top_notice`
 
+## Phase 5: Deployment Hardening
+
+Serverless and edge runtime improvements.
+
+- [ ] Webhook reaction lifecycle hardening — attach the full async reaction resolution chain to `waitUntil` so `processReaction` is not dropped after an early webhook response
+- [ ] Modal submit lifecycle hardening — attach post-submit `patchCard` / `sendCardMessage` follow-up work to `waitUntil` so card updates are preserved in edge/serverless runtimes
+
 ## Not Planned
 
 Features that don't apply to Lark:
