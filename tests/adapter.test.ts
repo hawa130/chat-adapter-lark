@@ -108,7 +108,7 @@ const makeStreamGen = () => {
 
 type SentMessageRequestBody = {
   content?: string
-  msg_type?: 'file' | 'interactive' | 'text'
+  msg_type?: 'audio' | 'file' | 'image' | 'interactive' | 'media' | 'text'
   receive_id?: string
 }
 
@@ -902,6 +902,78 @@ describe('LarkAdapter', () => {
       expect(sentBodies).toHaveLength(1)
       expect(sentBodies[0]).toMatchObject({ msg_type: 'file', receive_id: 'oc_chat001' })
       expect(result.id).toBe('om_file_only')
+    })
+
+    it('postMessage with audio file uploads opus and sends audio message', async () => {
+      const sentBodies: SentMessageRequestBody[] = []
+      let uploadedType: string | null = null
+      server.use(
+        tokenHandler,
+        http.post(`${BASE}/open-apis/im/v1/files`, async ({ request }) => {
+          const body = await request.formData()
+          uploadedType = String(body.get('file_type'))
+          return HttpResponse.json({ code: 0, data: { file_key: 'file_audio_001' } })
+        }),
+        http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
+          const body = (await request.json()) as SentMessageRequestBody
+          sentBodies.push(body)
+          return HttpResponse.json({ code: 0, data: { message_id: 'om_audio1' } })
+        }),
+      )
+
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+      const result = await adapter.postMessage(threadId, {
+        files: [
+          {
+            data: Buffer.from('audio-bytes'),
+            filename: 'voice.opus',
+            mimeType: 'audio/opus',
+          },
+        ],
+        raw: '   ',
+      })
+
+      expect(uploadedType).toBe('opus')
+      expect(sentBodies).toHaveLength(1)
+      expect(sentBodies[0]).toMatchObject({ msg_type: 'audio', receive_id: 'oc_chat001' })
+      expect(JSON.parse(sentBodies[0].content ?? '{}')).toEqual({ file_key: 'file_audio_001' })
+      expect(result.id).toBe('om_audio1')
+    })
+
+    it('postMessage with mp4 uploads mp4 and sends media message', async () => {
+      const sentBodies: SentMessageRequestBody[] = []
+      let uploadedType: string | null = null
+      server.use(
+        tokenHandler,
+        http.post(`${BASE}/open-apis/im/v1/files`, async ({ request }) => {
+          const body = await request.formData()
+          uploadedType = String(body.get('file_type'))
+          return HttpResponse.json({ code: 0, data: { file_key: 'file_video_001' } })
+        }),
+        http.post(`${BASE}/open-apis/im/v1/messages`, async ({ request }) => {
+          const body = (await request.json()) as SentMessageRequestBody
+          sentBodies.push(body)
+          return HttpResponse.json({ code: 0, data: { message_id: 'om_video1' } })
+        }),
+      )
+
+      const threadId = adapter.encodeThreadId({ chatId: 'oc_chat001' })
+      const result = await adapter.postMessage(threadId, {
+        files: [
+          {
+            data: Buffer.from('video-bytes'),
+            filename: 'demo.mp4',
+            mimeType: 'video/mp4',
+          },
+        ],
+        raw: '',
+      })
+
+      expect(uploadedType).toBe('mp4')
+      expect(sentBodies).toHaveLength(1)
+      expect(sentBodies[0]).toMatchObject({ msg_type: 'media', receive_id: 'oc_chat001' })
+      expect(JSON.parse(sentBodies[0].content ?? '{}')).toEqual({ file_key: 'file_video_001' })
+      expect(result.id).toBe('om_video1')
     })
 
     it('editMessage calls updateMessage', async () => {

@@ -199,6 +199,16 @@ const MIME_TO_LARK_FILE_TYPE: Record<string, LarkFileType> = {
 
 const mimeToLarkFileType = (mime: string): LarkFileType => MIME_TO_LARK_FILE_TYPE[mime] ?? 'stream'
 
+const larkFileTypeToMessageType = (fileType: LarkFileType): 'audio' | 'file' | 'media' => {
+  if (fileType === 'opus') {
+    return 'audio'
+  }
+  if (fileType === 'mp4') {
+    return 'media'
+  }
+  return 'file'
+}
+
 const MEDIA_MESSAGE_TYPES = new Set(['image', 'file', 'audio', 'media'])
 
 const streamToBuffer = async (stream: Readable): Promise<Buffer> => {
@@ -1173,9 +1183,14 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
 
   private async sendUploadedFile(decoded: LarkThreadId, buf: Buffer, file: FileUpload) {
     const mime = file.mimeType ?? ''
-    const uploadRes = await this.api.uploadFile(buf, file.filename, mimeToLarkFileType(mime))
+    const fileType = mimeToLarkFileType(mime)
+    const uploadRes = await this.api.uploadFile(buf, file.filename, fileType)
     const fileKey = uploadRes?.file_key ?? ''
-    return this.sendOrReply(decoded, 'file', JSON.stringify({ file_key: fileKey }))
+    return this.sendOrReply(
+      decoded,
+      larkFileTypeToMessageType(fileType),
+      JSON.stringify({ file_key: fileKey }),
+    )
   }
 
   private async uploadAndSendFile(decoded: LarkThreadId, file: FileUpload) {
