@@ -91,14 +91,16 @@ Add the following scopes to your app. The table maps each permission to the adap
 
 **Feature-specific — add based on the features you use:**
 
-| Permission                        | Lark API                                           | Adapter feature                    |
-| --------------------------------- | -------------------------------------------------- | ---------------------------------- |
-| `im:message.reactions:write_only` | Add/remove reactions                               | `addReaction`, `removeReaction`    |
-| `im:resource`                     | `POST /im/v1/images`, `POST /im/v1/files`          | File and image uploads             |
-| `cardkit:card:write`              | `POST /cardkit/v1/cards`, element/settings updates | Card streaming                     |
-| `im:chat:create`                  | `POST /im/v1/chats`                                | Create DM conversations (`openDM`) |
+| Permission                        | Lark API                                           | Adapter feature                                                   |
+| --------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------- |
+| `im:message.reactions:write_only` | Add/remove reactions                               | `addReaction`, `removeReaction`                                   |
+| `im:resource`                     | `POST /im/v1/images`, `POST /im/v1/files`          | File and image uploads                                            |
+| `cardkit:card:write`              | `POST /cardkit/v1/cards`, element/settings updates | CardKit-backed cards: `postMessage(card)`, `openModal`, streaming |
+| `im:chat:create`                  | `POST /im/v1/chats`                                | Create DM conversations (`openDM`)                                |
 
 > **Note:** `im:message:readonly` also covers reaction events (`im.message.reaction.created/deleted_v1`) and listing reactions, so no additional permission is needed for receiving reaction events.
+
+> **Note:** Lark supports broader permission coverage for some message APIs. For example, `im:message:send_as_bot` can cover sending, editing, deleting, and updating app-sent message cards where the API documentation lists permissions as "any one of".
 
 ### 4. Publish
 
