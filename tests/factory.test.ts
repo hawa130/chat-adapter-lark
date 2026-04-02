@@ -49,12 +49,33 @@ describe('createLarkAdapter', () => {
     expect(adapter.name).toBe('lark')
   })
 
+  it('throws on invalid explicit domain value', async () => {
+    process.env.LARK_APP_ID = 'id'
+    process.env.LARK_APP_SECRET = 'secret'
+    const { createLarkAdapter } = await import('../src/factory.ts')
+
+    expect(() =>
+      createLarkAdapter({
+        domain: 'lakr',
+      }),
+    ).toThrow(/domain/i)
+  })
+
   it('reads LARK_DOMAIN=lark', async () => {
     process.env.LARK_APP_ID = 'id'
     process.env.LARK_APP_SECRET = 'secret'
     process.env.LARK_DOMAIN = 'lark'
     const { createLarkAdapter } = await import('../src/factory.ts')
     expect(() => createLarkAdapter()).not.toThrow()
+  })
+
+  it('throws on invalid LARK_DOMAIN env value', async () => {
+    process.env.LARK_APP_ID = 'id'
+    process.env.LARK_APP_SECRET = 'secret'
+    process.env.LARK_DOMAIN = 'lakr'
+    const { createLarkAdapter } = await import('../src/factory.ts')
+
+    expect(() => createLarkAdapter()).toThrow(/LARK_DOMAIN|domain/i)
   })
 
   it('reads LARK_ENCRYPT_KEY from env', async () => {
