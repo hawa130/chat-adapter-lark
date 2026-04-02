@@ -1018,6 +1018,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
     const emojiType = data.reaction_type?.emoji_type ?? ''
     const messageId = data.message_id
     const userId = data.user_id?.open_id ?? ''
+    const emoji = fromLarkReactionEmojiType(emojiType)
 
     void Promise.all([
       this.resolveReactionThreadId(messageId),
@@ -1027,7 +1028,7 @@ export class LarkAdapter implements Adapter<LarkThreadId, LarkRaw> {
         {
           adapter: this,
           added,
-          emoji: { name: emojiType, toJSON: () => '', toString: () => '' },
+          emoji,
           messageId,
           raw: data,
           rawEmoji: emojiType,

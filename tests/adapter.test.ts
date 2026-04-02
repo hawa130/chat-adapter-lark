@@ -492,11 +492,13 @@ describe('LarkAdapter', () => {
       })
       const call = mockChat.processReaction.mock.calls[0]!
       const reactionEvent = call[0] as {
+        emoji: { name: string }
         threadId: string
         messageId: string
         rawEmoji: string
         user: { fullName: string; userName: string }
       }
+      expect(reactionEvent.emoji.name).toBe('thumbs_up')
       expect(reactionEvent.threadId).toContain('lark:')
       expect(reactionEvent.messageId).toBe('om_msg001')
       expect(reactionEvent.rawEmoji).toBe('THUMBSUP')
@@ -505,6 +507,44 @@ describe('LarkAdapter', () => {
       // Verify threadId decodes back to the chat from getMessage
       expect(adapter.channelIdFromThreadId(reactionEvent.threadId)).toBe('oc_chat001')
       expect(adapter.decodeThreadId(reactionEvent.threadId).threadId).toBe('omt_thread001')
+    })
+
+    it('keeps unknown Feishu reaction types as-is when normalizing webhook events', async () => {
+      const adapter = makeAdapter()
+      const mockChat = await initAdapter(adapter)
+
+      server.use(
+        http.get(`${BASE}/open-apis/im/v1/messages/:message_id`, () =>
+          HttpResponse.json({
+            code: 0,
+            data: {
+              items: [{ chat_id: 'oc_chat001', message_id: 'om_msg001', root_id: '' }],
+            },
+          }),
+        ),
+      )
+
+      const baseEvent = makeReactionEvent('created')
+      const event = {
+        ...baseEvent,
+        event: {
+          ...baseEvent.event,
+          reaction_type: { emoji_type: 'Typing' },
+        },
+      }
+
+      await adapter.handleWebhook(makeRequest(event))
+
+      await vi.waitFor(() => {
+        expect(mockChat.processReaction).toHaveBeenCalledTimes(1)
+      })
+
+      const reactionEvent = mockChat.processReaction.mock.calls[0]![0] as {
+        emoji: { name: string }
+        rawEmoji: string
+      }
+      expect(reactionEvent.emoji.name).toBe('Typing')
+      expect(reactionEvent.rawEmoji).toBe('Typing')
     })
 
     it('routes card.action.trigger to processAction', async () => {
