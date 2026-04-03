@@ -347,7 +347,9 @@ describe('cardToLarkInteractive', () => {
       expect(firstRow.columns).toHaveLength(EXPECTED_TWO)
       const labelCol = firstOf(firstRow.columns)
       const valueCol = secondOf(firstRow.columns)
-      expect((firstOf(labelCol.elements) as LarkMarkdownElement).content).toBe('**Name**')
+      expect((firstOf(labelCol.elements) as LarkMarkdownElement).content).toBe(
+        '<font color="grey">Name</font>',
+      )
       expect((firstOf(valueCol.elements) as LarkMarkdownElement).content).toBe('John')
       expect((firstOf(valueCol.elements) as LarkMarkdownElement).text_align).toBe('right')
     })

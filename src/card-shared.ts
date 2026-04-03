@@ -13,7 +13,7 @@ const mapFieldsToColumns = (fields: FieldLike[], nextId: () => string): LarkColu
       {
         elements: [
           {
-            content: `**${field.label ?? ''}**`,
+            content: `<font color="grey">${field.label ?? ''}</font>`,
             element_id: nextId(),
             tag: 'markdown',
           } satisfies LarkMarkdownElement,
